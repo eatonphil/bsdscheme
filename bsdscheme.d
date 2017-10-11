@@ -5,7 +5,7 @@ import std.string;
 enum TokenType {
   LeftParen,
   RightParen,
-  Integer,
+  Symbol,
 }
 
 struct Token {
@@ -43,6 +43,10 @@ class Buffer(T) {
     return true;
   }
 
+  void increase(int size) {
+    this.buffer.length += size;
+  }
+
   bool previous() {
     if (this.index == 0) {
       return false;
@@ -66,7 +70,6 @@ class Buffer(T) {
 }
 
 alias Buffer!(char) StringBuffer;
-alias Buffer!(Token) TokenBuffer;
 
 Token* lexLeftParen(StringBuffer input) {
   if (input.current() == '(') {
@@ -85,27 +88,30 @@ Token* lexRightParen(StringBuffer input) {
 }
 
 Token* lexSymbol(StringBuffer input) {
-  auto intString = "";
+  string symbol = "";
+  string currentCharAsString = "";
 
-  while (true) {
-    intString ~= currentCharAsString;
-    currentCharAsString = to!string(input.current());
+  while ((currentCharAsString = to!string(input.current())) != " ") {
+    symbol ~= currentCharAsString;
 
-    input.next();
+    if (!input.next()) {
+      break;
+    }
   }
 
-  if (intString.length) {
-    input.previous();
-    return new Token(0, 0, "", intString, TokenType.Integer);
+  if (symbol.length) {
+    return new Token(0, 0, "", symbol, TokenType.Symbol);
   }
 
   return null;
 }
 
+alias Buffer!(Token*) TokenBuffer;
+
 TokenBuffer lex(StringBuffer input) {
   auto tokens = new TokenBuffer();
 
-  while (input.next()) {
+  do {
     auto token = lexLeftParen(input);
     if (token is null) {
       token = lexRightParen(input);
@@ -120,19 +126,80 @@ TokenBuffer lex(StringBuffer input) {
     }
 
     if (token !is null) {
-      tokens.push(*token);
+      tokens.push(token);
     }
-  }
+  } while (!input.next());
 
   return tokens;
 }
 
-void parse() {
-  char[] program = "(+ (- 3 2) 5)".dup;
-  writeln(lex(new StringBuffer(program)).buffer);
+alias Buffer!(SExp*) SExpBuffer;
+
+struct Exp {
+  SExp* head;
+  SExpBuffer tail;
+};
+
+alias Atom Token;
+
+class SExp {
+  union {
+    Exp* exp;
+    Atom* atom;
+  } value;
+
+  bool isAtom() {
+    return this.value.atom !is null;
+  }
+};
+
+class Program {
+  SExp* program;
+
+  this(SExp program) {
+    this.program = program;
+  }
+
+  void run() {
+    
+  }
+}
+
+Program parse(TokenBuffer tokens) {
+  SExp* sexp;
+  SExp* currentSexp = sexp;
+
+  do {
+    auto token = tokens.current();
+
+    if (token.type == LeftParen) {
+      if (currentSexp is null) {
+        currentSexp = new SExp;
+      } else if (current.head is null) {
+        currentSexp.head = new SExp;
+        currentSexp = sexp.head;
+      } else {
+        sexp.tail.push(new SExp);
+        sexp.tail.next();
+        currentSexp = sexp.tail.current();
+      }
+    } else if (token.type == RightParen) {
+      if (sexp.head !is null) {
+        sexp.tail.increase(1);
+        sexp.tail.next();
+      }
+    } else {
+      currentSexp.value.atom = token;
+    }
+  } while (!tokens.next());
+
+  return new Program(sexp);
 }
 
 int main() {
-  parse();
+  auto source = "(+ (- 3 2) 5)".dup;
+  auto tokens = lex(new StringBuffer(source));
+  auto program = parse(tokens);
+  program.run();
   return 0;
 }
