@@ -1,10 +1,9 @@
 import std.conv;
-import std.functional;
 import std.file;
+import std.functional;
 import std.stdio;
 import std.string;
 import std.typecons;
-import std.variant;
 
 enum TokenType {
   LeftParen,
