@@ -1,4 +1,5 @@
 import std.conv;
+import std.functional;
 import std.stdio;
 import std.string;
 import std.typecons;
@@ -181,7 +182,11 @@ Tuple!(Token*[], SExp*) parse(Token*[] tokens, SExp* sexp) {
     i += 1;
   }
 
-  return Tuple!(Token*[], SExp*)(tokens[i + 1 .. tokens.length], sexp);
+  if (i > 0) {
+    return Tuple!(Token*[], SExp*)(tokens[i + 1 .. tokens.length], sexp);
+  }
+
+  return Tuple!(Token*[], SExp*)([], sexp);
 }
 
 Tuple!(Token*[], SExp*) parse(Token*[] tokens) {
@@ -194,13 +199,16 @@ void print(SExp* sexp) {
   }
 
   if (sexp.atom !is null) {
+    writef("%s ", sexp.atom.value);
     return;
   }
 
   if (sexp.sexps !is null) {
+    writef("(");
     foreach (ref _sexp; sexp.sexps) {
       print(_sexp);
     }
+    writef(")");
   }
 }
 
@@ -209,7 +217,7 @@ struct Value {
   string* _string;
   string* _symbol;
   bool _nil;
-  Value* function(SExp*[], Context ctx) _fun;
+  Value* delegate(SExp*[], Context ctx) _fun;
 }
 
 Value* plus(SExp*[] arguments, Context ctx) {
@@ -251,6 +259,33 @@ Value* let(SExp*[] arguments, Context ctx) {
   return interpret(letBody, newCtx);
 }
 
+Value* define(SExp*[] arguments, Context ctx) {
+  auto name = arguments[0].atom.value;
+  auto funArguments = arguments[1].sexps;
+  auto funBody = arguments[2];
+  
+  Context newCtx = ctx.dup();
+
+  Value* defined(SExp*[] parameters, Context ctx) {
+    for (int i = 0; i < funArguments.length; i++) {
+      auto key = funArguments[i].atom.value;
+      auto value = parameters[i];
+      newCtx.set(key, interpret(value, ctx));
+    }
+
+    return interpret(funBody, newCtx);
+  }
+
+  auto funValue = new Value;
+  funValue._fun = &defined;
+  ctx.set(name, funValue);
+
+  // TODO: define nil once
+  auto nilValue = new Value;
+  nilValue._nil = true;
+  return nilValue;
+}
+
 class Context {
   Value*[string] map;
 
@@ -276,20 +311,23 @@ class Context {
       value._integer = new int(to!int(key));
     } else if (key == "+") {
       value = new Value;
-      value._fun = &plus;
+      value._fun = toDelegate(&plus);
     } else if (key == "-") {
       value = new Value;
-      value._fun = &minus;
+      value._fun = toDelegate(&minus);
     } else if (key == "let") {
       value = new Value;
-      value._fun = &let;
+      value._fun = toDelegate(&let);
+    } else if (key == "define") {
+      value = new Value;
+      value._fun = toDelegate(&define);
     }
 
     return value;
   }
 }
 
-Value* interpret(SExp* sexp, Context ctx) {
+Value* interpret(SExp* sexp, Context ctx, bool topLevel) {
   Value* v = new Value;
 
   if (sexp is null) {
@@ -302,33 +340,67 @@ Value* interpret(SExp* sexp, Context ctx) {
     return ctx.get(sexp.atom.value);
   }
 
-  if (sexp.sexps !is null) {
-    auto head = interpret(sexp.sexps[0], ctx);
-    auto tail = sexp.sexps[1 .. sexp.sexps.length];
+  Value*[] vs;
 
-    if (!head._nil) {
-      if (head._fun !is null) {
-        return (*(head._fun))(tail, ctx);
-      } else if (tail.length == 0) {
-        return head;
-      } else {
-        // TODO: handle head not being a function
+  if (sexp.sexps !is null) {
+    if (topLevel) {
+      foreach (_sexp; sexp.sexps) {
+        vs ~= interpret(_sexp, ctx);
       }
     } else {
-      // TODO: handle this: ((identity +) 1 2)
+      auto head = interpret(sexp.sexps[0], ctx);
+      auto tail = sexp.sexps[1 .. sexp.sexps.length];
+
+      if (!head._nil) {
+        if (head._fun !is null) {
+          vs ~= head._fun(tail, ctx);
+        } else if (tail.length == 0) {
+          vs ~= head;
+        } else {
+          // TODO: handle head not being a function and not at the top-level
+        }
+      } else {
+        // TODO: handle this: ((identity +) 1 2)
+      }
     }
   }
 
-  v._nil = true;
-  return v;
-  // TODO: handle this?
+  if (vs.length == 0) {
+    v._nil = true;
+    return v;
+  } else {
+    return vs[vs.length - 1];
+  }
+}
+
+Value* interpret(SExp* sexp, Context ctx) {
+  return interpret(sexp, ctx, false);
 }
 
 int main() {
-  auto source = "(let ((a 7)) (+ (- 3 2) a 3))".dup;
+  //auto source = "(let ((a 7)) (+ (- 3 2) a 3))".dup;
+  auto source = "
+(define myfun (a b) (+ (- 3 2) a b))
+
+(myfun 21 3)
+".dup;
   auto tokens = lex(new StringBuffer(source));
-  auto program = parse(tokens.buffer)[1];
-  auto value = interpret(program, new Context);
-  writeln(*value._integer);
+
+  auto ctx = new Context;
+  auto buffer = tokens.buffer;
+  while (buffer.length > 0) {
+    Token*[] filteredBuffer;
+    foreach (token; buffer) {
+      if (token !is null) {
+        filteredBuffer ~= token;
+      }
+    }
+
+    auto parsed = parse(filteredBuffer);
+    auto value = interpret(parsed[1], ctx, true);
+    writeln(*value._integer);
+    buffer = parsed[0];
+  }
+
   return 0;
 }
