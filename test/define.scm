@@ -1,4 +1,6 @@
 (define myfun (a b)
   (+ (- 3 2) a b))
 
-(myfun 21 3)
+(define myval (+ 120 3))
+
+(myfun 21 myval)

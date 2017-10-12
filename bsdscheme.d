@@ -262,10 +262,9 @@ Value let(SExp*[] arguments, Context ctx) {
   return interpret(letBody, newCtx);
 }
 
-Value define(SExp*[] arguments, Context ctx) {
-  auto name = arguments[0].atom.value;
-  auto funArguments = arguments[1].sexps;
-  auto funBody = arguments[2];
+Value lambda(SExp*[] arguments, Context ctx) {
+  auto funArguments = arguments[0].sexps;
+  auto funBody = arguments[1];
   
   Context newCtx = ctx.dup();
 
@@ -281,8 +280,21 @@ Value define(SExp*[] arguments, Context ctx) {
 
   Value funValue;
   funValue._fun = &defined;
-  ctx.set(name, funValue);
   return funValue;
+}
+
+Value define(SExp*[] arguments, Context ctx) {
+  auto name = arguments[0].atom.value;
+  Value value;
+
+  if (arguments.length > 2) {
+    value = lambda(arguments[1 .. arguments.length], ctx);
+  } else {
+    value = interpret(arguments[1], ctx);
+  }
+
+  ctx.set(name, value);
+  return value;
 }
 
 class Context {
@@ -315,6 +327,8 @@ class Context {
       value._fun = toDelegate(&let);
     } else if (key == "define") {
       value._fun = toDelegate(&define);
+    } else if (key == "lambda") {
+      value._fun = toDelegate(&lambda);
     }
 
     return value;
