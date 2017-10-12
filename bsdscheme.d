@@ -218,6 +218,7 @@ struct Value {
   string* _string;
   string* _symbol;
   bool _nil;
+  bool* _bool;
   Value delegate(SExp*[], Context ctx) _fun;
 }
 
@@ -228,6 +229,18 @@ Value plus(SExp*[] arguments, Context ctx) {
 
   foreach (arg; arguments) {
     i += *(interpret(arg, ctx))._integer;
+  }
+
+  Value v;
+  v._integer = new int(i);
+  return v;
+}
+
+Value times(SExp*[] arguments, Context ctx) {
+  int i = 1;
+
+  foreach (arg; arguments) {
+    i *= *(interpret(arg, ctx))._integer;
   }
 
   Value v;
@@ -265,10 +278,10 @@ Value let(SExp*[] arguments, Context ctx) {
 Value lambda(SExp*[] arguments, Context ctx) {
   auto funArguments = arguments[0].sexps;
   auto funBody = arguments[1];
-  
-  Context newCtx = ctx.dup();
 
   Value defined(SExp*[] parameters, Context ctx) {
+    Context newCtx = ctx.dup();
+
     for (int i = 0; i < funArguments.length; i++) {
       auto key = funArguments[i].atom.value;
       auto value = parameters[i];
@@ -297,6 +310,52 @@ Value define(SExp*[] arguments, Context ctx) {
   return value;
 }
 
+Value equals(SExp*[] arguments, Context ctx) {
+  auto left = interpret(arguments[0], ctx);
+  auto right = interpret(arguments[1], ctx);
+
+  Value v;
+  bool b;
+
+  if (left._integer !is null) {
+    b = right._integer !is null && *(right._integer) == *(left._integer);
+  } else if (left._string !is null) {
+    b = right._string !is null && *(right._string) == *(left._string);
+  } else if (left._symbol !is null) {
+    b = right._symbol !is null && right._symbol == left._symbol;
+  } else if (left._fun !is null) {
+    b = right._fun !is null && right._fun == left._fun;
+  } else if (left._bool !is null) {
+    b = right._bool !is null && *(right._bool) == *(left._bool);
+  }
+
+  v._bool = new bool(b);
+  return v;
+}
+
+Value ifFun(SExp*[] arguments, Context ctx) {
+  auto test = interpret(arguments[0], ctx);
+  auto ok = false;
+
+  if (test._integer !is null) {
+    ok = *(test._integer) != 0;
+  } else if (test._string !is null) {
+    ok = test._string.length != 0;
+  } else if (test._symbol !is null) {
+    ok = true;
+  } else if (test._fun !is null) {
+    ok = true;
+  } else if (test._bool !is null) {
+    ok = *test._bool;
+  }
+
+  if (ok) {
+    return interpret(arguments[1], ctx);
+  }
+
+  return interpret(arguments[2], ctx);
+ }
+
 class Context {
   Value[string] map;
 
@@ -321,6 +380,8 @@ class Context {
       value._integer = new int(to!int(key));
     } else if (key == "+") {
       value._fun = toDelegate(&plus);
+    } else if (key == "*") {
+      value._fun = toDelegate(&times);
     } else if (key == "-") {
       value._fun = toDelegate(&minus);
     } else if (key == "let") {
@@ -329,6 +390,10 @@ class Context {
       value._fun = toDelegate(&define);
     } else if (key == "lambda") {
       value._fun = toDelegate(&lambda);
+    } else if (key == "=") {
+      value._fun = toDelegate(&equals);
+    } else if (key == "if") {
+      value._fun = toDelegate(&ifFun);
     }
 
     return value;
