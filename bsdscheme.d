@@ -218,34 +218,36 @@ struct Value {
   string* _string;
   string* _symbol;
   bool _nil;
-  Value* delegate(SExp*[], Context ctx) _fun;
+  Value delegate(SExp*[], Context ctx) _fun;
 }
 
-Value* plus(SExp*[] arguments, Context ctx) {
+Value nilValue = { _nil: true };
+
+Value plus(SExp*[] arguments, Context ctx) {
   int i = 0;
 
   foreach (arg; arguments) {
-    i += *(*(interpret(arg, ctx)))._integer;
+    i += *(interpret(arg, ctx))._integer;
   }
 
-  auto v = new Value;
+  Value v;
   v._integer = new int(i);
   return v;
 }
 
-Value* minus(SExp*[] arguments, Context ctx) {
-  int i = *(*(interpret(arguments[0], ctx)))._integer;
+Value minus(SExp*[] arguments, Context ctx) {
+  int i = *(interpret(arguments[0], ctx))._integer;
 
   foreach (arg; arguments[1 .. arguments.length]) {
-    i -= *(*(interpret(arg, ctx)))._integer;
+    i -= *(interpret(arg, ctx))._integer;
   }
 
-  auto v = new Value;
+  Value v;
   v._integer = new int(i);
   return v;
 }
 
-Value* let(SExp*[] arguments, Context ctx) {
+Value let(SExp*[] arguments, Context ctx) {
   auto bindings = arguments[0].sexps;
   auto letBody = arguments[1];
 
@@ -260,14 +262,14 @@ Value* let(SExp*[] arguments, Context ctx) {
   return interpret(letBody, newCtx);
 }
 
-Value* define(SExp*[] arguments, Context ctx) {
+Value define(SExp*[] arguments, Context ctx) {
   auto name = arguments[0].atom.value;
   auto funArguments = arguments[1].sexps;
   auto funBody = arguments[2];
   
   Context newCtx = ctx.dup();
 
-  Value* defined(SExp*[] parameters, Context ctx) {
+  Value defined(SExp*[] parameters, Context ctx) {
     for (int i = 0; i < funArguments.length; i++) {
       auto key = funArguments[i].atom.value;
       auto value = parameters[i];
@@ -277,20 +279,16 @@ Value* define(SExp*[] arguments, Context ctx) {
     return interpret(funBody, newCtx);
   }
 
-  auto funValue = new Value;
+  Value funValue;
   funValue._fun = &defined;
   ctx.set(name, funValue);
-
-  // TODO: define nil once
-  auto nilValue = new Value;
-  nilValue._nil = true;
-  return nilValue;
+  return funValue;
 }
 
 class Context {
-  Value*[string] map;
+  Value[string] map;
 
-  void set(string key, Value* value) {
+  void set(string key, Value value) {
     this.map[key] = value;
   }
 
@@ -300,27 +298,22 @@ class Context {
     return dup;
   }
 
-  Value* get(string key) {
-    Value* value = null;
+  Value get(string key) {
+    Value value;
 
     if (key in this.map) {
       value = this.map[key];
     }
 
     if (isNumeric(key)) {
-      value = new Value;
       value._integer = new int(to!int(key));
     } else if (key == "+") {
-      value = new Value;
       value._fun = toDelegate(&plus);
     } else if (key == "-") {
-      value = new Value;
       value._fun = toDelegate(&minus);
     } else if (key == "let") {
-      value = new Value;
       value._fun = toDelegate(&let);
     } else if (key == "define") {
-      value = new Value;
       value._fun = toDelegate(&define);
     }
 
@@ -328,20 +321,17 @@ class Context {
   }
 }
 
-Value* interpret(SExp* sexp, Context ctx, bool topLevel) {
-  Value* v = new Value;
-
+Value interpret(SExp* sexp, Context ctx, bool topLevel) {
   if (sexp is null) {
     // TODO: handle this?
-    v._nil = true;
-    return v;
+    return nilValue;
   }
 
   if (sexp.atom !is null) {
     return ctx.get(sexp.atom.value);
   }
 
-  Value*[] vs;
+  Value[] vs;
 
   if (sexp.sexps !is null) {
     if (topLevel) {
@@ -367,14 +357,13 @@ Value* interpret(SExp* sexp, Context ctx, bool topLevel) {
   }
 
   if (vs.length == 0) {
-    v._nil = true;
-    return v;
+    return nilValue;
   } else {
     return vs[vs.length - 1];
   }
 }
 
-Value* interpret(SExp* sexp, Context ctx) {
+Value interpret(SExp* sexp, Context ctx) {
   return interpret(sexp, ctx, false);
 }
 
