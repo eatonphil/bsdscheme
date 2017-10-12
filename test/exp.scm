@@ -3,4 +3,4 @@
       1
       (* base (exp base (- pow 1)))))
 
-(exp 9 10)
+(exp 3 3)
