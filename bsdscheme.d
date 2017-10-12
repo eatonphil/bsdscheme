@@ -1,5 +1,6 @@
 import std.conv;
 import std.functional;
+import std.file;
 import std.stdio;
 import std.string;
 import std.typecons;
@@ -377,13 +378,8 @@ Value* interpret(SExp* sexp, Context ctx) {
   return interpret(sexp, ctx, false);
 }
 
-int main() {
-  //auto source = "(let ((a 7)) (+ (- 3 2) a 3))".dup;
-  auto source = "
-(define myfun (a b) (+ (- 3 2) a b))
-
-(myfun 21 3)
-".dup;
+int main(string[] args) {
+  char[] source = cast(char[])read(args[1]);
   auto tokens = lex(new StringBuffer(source));
 
   auto ctx = new Context;
