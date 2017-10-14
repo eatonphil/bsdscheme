@@ -1,6 +1,6 @@
 # BSDScheme
 
-This is a Scheme interpreter written in D intended to eventual target Scheme R7RS.
+This is a Scheme interpreter written in D intended to eventually target Scheme R7RS.
 
 ## Installation
 
