@@ -3,4 +3,5 @@
 
 (define myval (+ 120 3))
 
-(myfun 21 myval)
+(display (myfun 21 myval))
+(newline)

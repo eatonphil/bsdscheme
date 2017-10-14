@@ -1,5 +1,7 @@
+import core.stdc.stdlib;
 import std.conv;
 import std.file;
+import std.format;
 import std.functional;
 import std.stdio;
 import std.string;
@@ -355,21 +357,29 @@ Value ifFun(SExp*[] arguments, Context ctx) {
   return interpret(arguments[2], ctx);
  }
 
-Value display(SExp*[] arguments, Context ctx) {
-  auto value = interpret(arguments[0], ctx);
-
+string valueToString(Value value) {
   if (value._integer !is null) {
-    write(*(value._integer));
+    return format("%d", *(value._integer));
   } else if (value._bool !is null) {
-    write(*(value._bool));
+    if (*(value._bool)) {
+      return "#t";
+    }
+
+    return "#f";
   } else if (value._symbol !is null) {
-    write(*(value._symbol));
+    return *(value._symbol);
   } else if (value._string !is null) {
-    write(*(value._string));
+    return *(value._string);
   } else if (value._nil) {
-    write("nil");
+    return "nil";
   }
 
+  return format("unknown value (%s)", value);
+}
+
+Value display(SExp*[] arguments, Context ctx) {
+  auto value = interpret(arguments[0], ctx);
+  write(valueToString(value));
   return nilValue;
 }
 
@@ -424,6 +434,11 @@ class Context {
   }
 }
 
+void error(string msg, Value value) {
+  writeln(format("[ERROR] %s: %s", msg, valueToString(value)));
+  exit(1);
+}
+
 Value interpret(SExp* sexp, Context ctx, bool topLevel) {
   if (sexp is null) {
     // TODO: handle this?
@@ -448,10 +463,8 @@ Value interpret(SExp* sexp, Context ctx, bool topLevel) {
       if (!head._nil) {
         if (head._fun !is null) {
           vs ~= head._fun(tail, ctx);
-        } else if (tail.length == 0) {
-          vs ~= head;
         } else {
-          // TODO: handle head not being a function and not at the top-level
+          error("Call of non-procedure", head);
         }
       } else {
         // TODO: handle this: ((identity +) 1 2)
