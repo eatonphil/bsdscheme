@@ -388,6 +388,13 @@ Value newline(SExp*[] arguments, Context ctx) {
   return nilValue;
 }
 
+Value setFun(SExp*[] arguments, Context ctx) {
+  auto name = arguments[0].atom.value;
+  auto value = interpret(arguments[1], ctx);
+  ctx.set(name, value);
+  return value;
+}
+
 class Context {
   Value[string] map;
   Value function(SExp*[], Context)[string] builtins;
@@ -404,6 +411,7 @@ class Context {
       "=": &equals,
       "newline": &newline,
       "display": &display,
+      "set!": &setFun,
     ];
   }
 
