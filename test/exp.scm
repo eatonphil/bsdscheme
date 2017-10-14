@@ -3,4 +3,5 @@
       1
       (* base (exp base (- pow 1)))))
 
-(exp 3 3)
+(display (exp 3 3))
+(newline)

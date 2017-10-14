@@ -355,8 +355,47 @@ Value ifFun(SExp*[] arguments, Context ctx) {
   return interpret(arguments[2], ctx);
  }
 
+Value display(SExp*[] arguments, Context ctx) {
+  auto value = interpret(arguments[0], ctx);
+
+  if (value._integer !is null) {
+    write(*(value._integer));
+  } else if (value._bool !is null) {
+    write(*(value._bool));
+  } else if (value._symbol !is null) {
+    write(*(value._symbol));
+  } else if (value._string !is null) {
+    write(*(value._string));
+  } else if (value._nil) {
+    write("nil");
+  }
+
+  return nilValue;
+}
+
+Value newline(SExp*[] arguments, Context ctx) {
+  write("\n");
+  return nilValue;
+}
+
 class Context {
   Value[string] map;
+  Value function(SExp*[], Context)[string] builtins;
+
+  this() {
+    this.builtins = [
+      "if": &ifFun,
+      "+": &plus,
+      "-": &minus,
+      "*": &times,
+      "let": &let,
+      "define": &define,
+      "lambda": &lambda,
+      "=": &equals,
+      "newline": &newline,
+      "display": &display,
+    ];
+  }
 
   void set(string key, Value value) {
     this.map[key] = value;
@@ -371,28 +410,14 @@ class Context {
   Value get(string key) {
     Value value;
 
-    if (key in this.map) {
-      value = this.map[key];
-    }
-
     if (isNumeric(key)) {
       value._integer = new int(to!int(key));
-    } else if (key == "+") {
-      value._fun = toDelegate(&plus);
-    } else if (key == "*") {
-      value._fun = toDelegate(&times);
-    } else if (key == "-") {
-      value._fun = toDelegate(&minus);
-    } else if (key == "let") {
-      value._fun = toDelegate(&let);
-    } else if (key == "define") {
-      value._fun = toDelegate(&define);
-    } else if (key == "lambda") {
-      value._fun = toDelegate(&lambda);
-    } else if (key == "=") {
-      value._fun = toDelegate(&equals);
-    } else if (key == "if") {
-      value._fun = toDelegate(&ifFun);
+    } else if (key in this.builtins) {
+      value._fun = toDelegate(builtins[key]);
+    }
+
+    if (key in this.map) {
+      value = this.map[key];
     }
 
     return value;
@@ -461,7 +486,6 @@ int main(string[] args) {
 
     auto parsed = parse(filteredBuffer);
     auto value = interpret(parsed[1], ctx, true);
-    writeln(*value._integer);
     buffer = parsed[0];
   }
 
