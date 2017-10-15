@@ -10,6 +10,7 @@ import std.typecons;
 enum TokenType {
   LeftParen,
   RightParen,
+  Quote,
   Symbol,
 }
 
@@ -92,6 +93,14 @@ Token* lexRightParen(StringBuffer input) {
   return null;
 }
 
+Token* lexQuote(StringBuffer input) {
+  if (input.current() == '\'') {
+    return new Token(0, 0, "", "\'", TokenType.Quote);
+  }
+
+  return null;
+}
+
 Token* lexSymbol(StringBuffer input) {
   string symbol = "";
 
@@ -101,6 +110,7 @@ Token* lexSymbol(StringBuffer input) {
     switch (c) {
     case '(':
     case ')':
+    case '\'':
     case ' ':
     case '\n':
     case '\t':
@@ -132,6 +142,10 @@ TokenBuffer lex(StringBuffer input) {
 
     if (token is null) {
       token = lexRightParen(input);
+    }
+
+    if (token is null) {
+      token = lexQuote(input);
     }
 
     if (token is null) {
@@ -167,12 +181,30 @@ Tuple!(Token*[], SExp*) parse(Token*[] tokens, SExp* sexp) {
     switch (token.type) {
     case TokenType.LeftParen:
       auto program = parse(tokens[i + 1 .. tokens.length]);
-      (*sexp).sexps ~= program[1];
+      sexp.sexps ~= program[1];
       tokens = program[0];
       i = -1;
       break;
     case TokenType.RightParen:
       return Tuple!(Token*[], SExp*)(tokens[i + 1 .. tokens.length], sexp);
+      break;
+    case TokenType.Quote:
+      auto quoteSexp = new SExp;
+
+      auto quote = new SExp;
+      quote.atom = new Token(0, 0, "", "quote", TokenType.Quote);
+
+      auto program = parse(tokens[i + 1 .. tokens.length]);
+
+      quoteSexp.sexps ~= quote;
+      quoteSexp.sexps ~= program[1];
+      sexp.sexps ~= quoteSexp;
+
+      tokens = [new Token(0, 0, "", ")", TokenType.RightParen)];
+      foreach (nextToken; program[0]) {
+        tokens ~= nextToken;
+      }
+      i = -1;
       break;
     default:
       auto atom = new SExp;
@@ -218,6 +250,7 @@ struct Value {
   int* _integer;
   string* _string;
   string* _symbol;
+  Tuple!(Value, Value)* _list;
   bool _nil;
   bool* _bool;
   Value delegate(SExp*[], Context ctx) _fun;
@@ -370,8 +403,10 @@ string valueToString(Value value) {
     return *(value._symbol);
   } else if (value._string !is null) {
     return *(value._string);
+  } else if (value._list !is null) {
+    return format("(%s . %s)", valueToString((*value._list)[0]), valueToString((*value._list)[1]));
   } else if (value._nil) {
-    return "nil";
+    return "'()";
   }
 
   return format("unknown value (%s)", value);
@@ -395,6 +430,32 @@ Value setFun(SExp*[] arguments, Context ctx) {
   return value;
 }
 
+Value quote(SExp*[] arguments, Context ctx) {
+  if (arguments.length == 1) {
+    auto first = arguments[0];
+    if (first.atom is null && first.sexps[0].atom is null && first.sexps[0].sexps is null) {
+      return nilValue;
+    }
+  }
+
+  error("Cannot handle quoting more than 1 argument", nilValue);
+  return nilValue;
+}
+
+Value cons(SExp*[] arguments, Context ctx) {
+  auto first = interpret(arguments[0], ctx);
+  auto second = interpret(arguments[1], ctx);
+
+  Value list;
+  list._list = new Tuple!(Value, Value)(first, second);
+  return list;
+}
+
+Value car(SExp*[] arguments, Context ctx) {
+  auto list = interpret(arguments[0], ctx);
+  return (*list._list)[0];
+}
+
 class Context {
   Value[string] map;
   Value function(SExp*[], Context)[string] builtins;
@@ -412,6 +473,9 @@ class Context {
       "newline": &newline,
       "display": &display,
       "set!": &setFun,
+      "quote": &quote,
+      "cons": &cons,
+      "car": &car,
     ];
   }
 
