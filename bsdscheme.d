@@ -14,12 +14,20 @@ enum TokenType {
   Symbol,
 }
 
+enum SchemeType {
+  String,
+  Symbol,
+  Integer,
+  Bool,
+}
+
 struct Token {
   int line;
   int lineOffset;
   string filename;
   string value;
   TokenType type;
+  SchemeType schemeType;
 }
 
 class Buffer(T) {
@@ -101,6 +109,21 @@ Token* lexQuote(StringBuffer input) {
   return null;
 }
 
+Token* lexBool(StringBuffer input) {
+  if (input.current() == '#') {
+    input.next();
+
+    if (input.current() == 't' || input.current() == 'f') {
+      return new Token(0, 0, "", "#", TokenType.Symbol, SchemeType.Bool);
+    }
+
+    input.previous();
+    input.previous();
+  }
+
+  return null;
+}
+
 Token* lexSymbol(StringBuffer input) {
   string symbol = "";
 
@@ -110,6 +133,7 @@ Token* lexSymbol(StringBuffer input) {
     switch (c) {
     case '(':
     case ')':
+    case '#':
     case '\'':
     case ' ':
     case '\n':
@@ -123,7 +147,13 @@ Token* lexSymbol(StringBuffer input) {
 
   if (symbol.length) {
     input.previous();
-    return new Token(0, 0, "", symbol, TokenType.Symbol);
+
+    auto schemeType = SchemeType.Symbol;
+    if (isNumeric(symbol)) {
+      schemeType = SchemeType.Integer;
+    }
+
+    return new Token(0, 0, "", symbol, TokenType.Symbol, schemeType);
   }
 
   return null;
@@ -152,6 +182,10 @@ TokenBuffer lex(StringBuffer input) {
       token = lexSymbol(input);
     }
 
+    if (token is null) {
+      token = lexBool(input);
+    }
+
     if (token !is null) {
       tokens.push(token);
     }
@@ -160,7 +194,6 @@ TokenBuffer lex(StringBuffer input) {
   return tokens;
 }
 
-alias Buffer!(SExp*) SExpBuffer;
 alias Token Atom;
 
 struct SExp {
@@ -246,11 +279,13 @@ void print(SExp* sexp) {
   }
 }
 
+alias Tuple!(Value, Value) List;
+
 struct Value {
   int* _integer;
-  string* _string;
-  string* _symbol;
-  Tuple!(Value, Value)* _list;
+  string _string;
+  string _symbol;
+  List* _list;
   bool _nil;
   bool* _bool;
   Value delegate(SExp*[], Context ctx) _fun;
@@ -354,7 +389,7 @@ Value equals(SExp*[] arguments, Context ctx) {
   if (left._integer !is null) {
     b = right._integer !is null && *(right._integer) == *(left._integer);
   } else if (left._string !is null) {
-    b = right._string !is null && *(right._string) == *(left._string);
+    b = right._string !is null && right._string == left._string;
   } else if (left._symbol !is null) {
     b = right._symbol !is null && right._symbol == left._symbol;
   } else if (left._fun !is null) {
@@ -400,9 +435,9 @@ string valueToString(Value value) {
 
     return "#f";
   } else if (value._symbol !is null) {
-    return *(value._symbol);
+    return value._symbol;
   } else if (value._string !is null) {
-    return *(value._string);
+    return value._string;
   } else if (value._list !is null) {
     return format("(%s . %s)", valueToString((*value._list)[0]), valueToString((*value._list)[1]));
   } else if (value._nil) {
@@ -430,16 +465,64 @@ Value setFun(SExp*[] arguments, Context ctx) {
   return value;
 }
 
-Value quote(SExp*[] arguments, Context ctx) {
-  if (arguments.length == 1) {
-    auto first = arguments[0];
-    if (first.atom is null && first.sexps[0].atom is null && first.sexps[0].sexps is null) {
-      return nilValue;
-    }
+Value atomToValue(Token* atom) {
+  if (atom is null) {
+    return nilValue;
   }
 
-  error("Cannot handle quoting more than 1 argument", nilValue);
-  return nilValue;
+  Value v;
+  string sValue = atom.value;
+  switch (atom.schemeType) {
+  case SchemeType.Integer:
+    int* i = new int(to!int(sValue));
+    v._integer = i;
+    break;
+  case SchemeType.String:
+    v._string = sValue;
+    break;
+  case SchemeType.Symbol:
+    v._symbol = sValue;
+    break;
+  case SchemeType.Bool:
+    bool* b = new bool(atom.value == "#t");
+    v._bool = b;
+    break;
+  default:
+    return nilValue;
+    break;
+  }
+
+  return v;
+}
+
+Value quote(SExp*[] arguments, Context ctx) {
+  if (arguments.length == 0) {
+    // TODO: probs should be an error?
+    return nilValue;
+  }
+
+  // TODO: handle arguments[0] is nilish?
+  if (arguments.length == 1) {
+    auto atom = arguments[0].atom;
+    auto sexps = arguments[0].sexps;
+    bool isPrimitive = sexps is null;
+    if (isPrimitive) {
+      return atomToValue(atom);
+    }
+
+    return quote(sexps, ctx);
+  }
+
+  Value value;
+  Value *iterator = &value;
+  foreach (argument; arguments) {
+    List* l = new List(quote([argument], ctx), nilValue);
+    (*iterator)._nil = false;
+    (*iterator)._list = l;
+    iterator = &((*l)[1]);
+  }
+
+  return value;
 }
 
 Value cons(SExp*[] arguments, Context ctx) {
@@ -447,7 +530,7 @@ Value cons(SExp*[] arguments, Context ctx) {
   auto second = interpret(arguments[1], ctx);
 
   Value list;
-  list._list = new Tuple!(Value, Value)(first, second);
+  list._list = new List(first, second);
   return list;
 }
 
@@ -492,9 +575,7 @@ class Context {
   Value get(string key) {
     Value value;
 
-    if (isNumeric(key)) {
-      value._integer = new int(to!int(key));
-    } else if (key in this.builtins) {
+    if (key in this.builtins) {
       value._fun = toDelegate(builtins[key]);
     }
 
@@ -513,12 +594,16 @@ void error(string msg, Value value) {
 
 Value interpret(SExp* sexp, Context ctx, bool topLevel) {
   if (sexp is null) {
-    // TODO: handle this?
     return nilValue;
   }
 
-  if (sexp.atom !is null) {
-    return ctx.get(sexp.atom.value);
+  bool isPrimitive = sexp.sexps is null;
+  if (isPrimitive) {
+    Value v = atomToValue(sexp.atom);
+
+    if (v._symbol !is null) {
+      return ctx.get(v._symbol);
+    }
   }
 
   Value[] vs;
