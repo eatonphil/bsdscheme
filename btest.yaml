@@ -1,0 +1,7 @@
+test_path: test
+
+runners:
+  - name: bsi
+    setup:
+      - ls
+    run: ./bsdscheme test.scm
