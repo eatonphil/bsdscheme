@@ -7,8 +7,8 @@ cases:
     stdout: 30
 
 templates:
-  - test.bs |
-    (define myfun (a b) (+ a b))
+- test.scm: |
 
+    (define myfun (a b) (+ a b))
 
     (display (myfun 21 9))

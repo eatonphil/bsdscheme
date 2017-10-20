@@ -604,6 +604,8 @@ Value interpret(SExp* sexp, Context ctx, bool topLevel) {
     if (v._symbol !is null) {
       return ctx.get(v._symbol);
     }
+
+    return v;
   }
 
   Value[] vs;
