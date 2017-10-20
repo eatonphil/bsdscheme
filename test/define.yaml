@@ -1,6 +1,3 @@
-runners:
-  - bsi
-
 cases:
   - name: define function
     status: 0

@@ -1,0 +1,14 @@
+cases:
+  - name: recursive function
+    status: 0
+    stdout: 9
+
+templates:
+- test.scm: |
+
+    (define exp (base pow)
+      (if (= pow 0)
+          1
+          (* base (exp base (- pow 1)))))
+    
+    (display (exp 3 3))
