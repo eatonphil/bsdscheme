@@ -1,0 +1,11 @@
+cases:
+  - name: define function
+    status: 0
+    stdout: 30
+
+templates:
+- test.scm: |
+
+    (define myfun (a b) (+ a b))
+
+    (display (myfun 21 9))

@@ -1,0 +1,9 @@
+cases:
+  - name: basic let
+    status: 0
+    stdout: 11
+
+templates:
+- test.scm: |
+
+    (display (let ((a 7)) (+ (- 3 2) a 3)))

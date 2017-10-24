@@ -1,0 +1,25 @@
+sudo: required
+
+language: d
+
+d:
+    - ldc
+
+script:
+    # ldc gets installed as other names sometimes
+    - sudo ln -s `which $DC` /usr/local/bin/ldc
+
+    # bsdscheme
+    - ldc bsdscheme.d
+    - sudo ln -s $PWD/bsdscheme /usr/local/bin/bsdscheme
+
+    # crystal
+    - curl https://dist.crystal-lang.org/apt/setup.sh | sudo bash
+    - sudo apt-get update && sudo apt-get install -y crystal
+
+    # btest
+    - git clone https://github.com/briansteffens/btest
+    - cd btest && make && sudo make install && cd ..
+
+    # run the tests
+    - btest

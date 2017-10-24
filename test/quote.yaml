@@ -1,0 +1,9 @@
+cases:
+  - name: car of quoted function call is the function symbol
+    status: 0
+    stdout: +
+
+templates:
+- test.scm: |
+
+    (display (car (quote (+ 1 2))))

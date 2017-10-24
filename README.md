@@ -25,3 +25,7 @@ $ cat test/exp.scm
 $ ./bsdscheme test/exp.scm
 27
 ```
+
+## Testing
+
+BSDScheme uses the [btest](https://github.com/briansteffens/btest) test framework.

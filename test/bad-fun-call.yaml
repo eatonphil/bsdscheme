@@ -1,0 +1,8 @@
+cases:
+  - name: 1 is not a function
+    status: 1
+    stdout: "[ERROR] Call of non-procedure: 1"
+
+templates:
+  - test.scm: |
+     (1)

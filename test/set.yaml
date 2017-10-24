@@ -1,0 +1,13 @@
+cases:
+  - name: set! alters a defined variable
+    status: 0
+    stdout: 5
+
+templates:
+- test.scm: |
+
+    (define f 4)
+
+    (set! f 5)
+
+    (display f)
