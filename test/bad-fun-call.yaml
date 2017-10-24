@@ -5,5 +5,4 @@ cases:
 
 templates:
   - test.scm: |
-
-    (1)
+     (1)

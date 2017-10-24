@@ -5,5 +5,4 @@ cases:
 
 templates:
   - test.scm: |
-
-    (display ((lambda (a) (+ a 1)) 20))
+     (display ((lambda (a) (+ a 1)) 20))
