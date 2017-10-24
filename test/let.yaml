@@ -1,7 +1,7 @@
 cases:
   - name: basic let
     status: 0
-    stdout: 0
+    stdout: 11
 
 templates:
 - test.scm: |

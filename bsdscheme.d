@@ -103,7 +103,7 @@ Token* lexRightParen(StringBuffer input) {
 
 Token* lexQuote(StringBuffer input) {
   if (input.current() == '\'') {
-    return new Token(0, 0, "", "\'", TokenType.Quote);
+    return new Token(0, 0, "", "\'", TokenType.Quote, SchemeType.Symbol);
   }
 
   return null;
@@ -225,7 +225,7 @@ Tuple!(Token*[], SExp*) parse(Token*[] tokens, SExp* sexp) {
       auto quoteSexp = new SExp;
 
       auto quote = new SExp;
-      quote.atom = new Token(0, 0, "", "quote", TokenType.Quote);
+      quote.atom = new Token(0, 0, "", "quote", TokenType.Quote, SchemeType.Symbol);
 
       auto program = parse(tokens[i + 1 .. tokens.length]);
 

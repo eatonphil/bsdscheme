@@ -1,7 +1,7 @@
 cases:
   - name: recursive function
     status: 0
-    stdout: 9
+    stdout: 27
 
 templates:
 - test.scm: |
