@@ -1,8 +1,10 @@
 import core.stdc.stdlib;
+import std.bigint;
 import std.conv;
 import std.file;
 import std.format;
 import std.functional;
+import std.stdint;
 import std.stdio;
 import std.string;
 import std.typecons;
@@ -282,51 +284,172 @@ void print(SExp* sexp) {
 alias Tuple!(Value, Value) List;
 
 struct Value {
-  int* _integer;
-  string _string;
-  string _symbol;
-  List* _list;
-  bool _nil;
-  bool* _bool;
-  Value delegate(SExp*[], Context ctx) _fun;
+  uint header;
+  void* data;
 }
 
-Value nilValue = { _nil: true };
+enum ValueTag {
+  Nil,
+  Integer,
+  Bool,
+  BigInteger,
+  String,
+  Symbol,
+  List,
+  Vector,
+  Function,
+}
 
-Value plus(SExp*[] arguments, Context ctx) {
-  int i = 0;
+bool isValue(ref Value v, ValueTag vt) {
+  return (v.header & 32) == vt;
+}
 
-  foreach (arg; arguments) {
-    i += *(interpret(arg, ctx))._integer;
+bool valueIsNil(ref Value v) { return isValue(v, ValueTag.Nil); }
+
+Value nilValue = { data: null, header: ValueTag.Nil };
+
+Value makeIntegerValue(uint i) {
+  Value v = { data: cast(void*)i, header: ValueTag.Integer };
+  return v;
+}
+
+bool valueIsInteger(ref Value v) { return isValue(v, ValueTag.Integer); }
+
+int valueToInteger(ref Value v) {
+  return cast(int)v.data;
+}
+
+Value makeBoolValue(bool b) {
+  Value v = { data: cast(void*)b, header: ValueTag.Bool };
+  return v;
+}
+
+bool valueIsBool(ref Value v) { return isValue(v, ValueTag.Bool); }
+
+bool valueToBool(ref Value v) {
+  return cast(bool)v.data;
+}
+
+Value makeBigIntegerValue(string i) {
+  Value v = { data: new BigInt(i), header: ValueTag.BigInteger };
+  return v;
+}
+
+bool valueIsBigInteger(ref Value v) { return isValue(v, ValueTag.BigInteger); }
+
+BigInt valueToBigInteger(ref Value v) {
+  return *cast(BigInt*)v.data;
+}
+
+static const int MAX_VALUE_LENGTH = uint.sizeof - 1;
+
+Value makeStringValue(string s) {
+  int size = s.length > MAX_VALUE_LENGTH ? MAX_VALUE_LENGTH : s.length;
+  void* sp = new string(s);
+  Value v = { data: s, header: size << 8 | ValueTag.String };
+  return v;
+}
+
+bool valueIsString(ref Value v) { return isValue(v, ValueTag.String); }
+
+string valueToString(ref Value v) {
+  return *cast(string*)v.data;
+}
+
+Value makeSymbolValue(string s) {
+  Value v = makeStringValue(s);
+  v.header >>= 8;
+  v.header <<= 8;
+  v.header |= ValueTag.Symbol;
+  return v;
+}
+
+bool valueIsSymbol(ref Value v) { return isValue(v, ValueTag.Symbol); }
+
+string valueToSymbol(ref Value v) {
+  return valueToString(v);
+}
+
+Value makeListValue(ref Value head, ref Value tail) {
+  Value v;
+  v.header = ValueTag.List;
+  v.data = new void*[2];
+  v.data[0] = head;
+  v.data[1] = tail;
+  return v;
+}
+
+bool valueIsList(ref Value v) { return isValue(v, ValueTag.List); }
+
+Tuple!(Value, Value) valueToList(Value v) {
+  return cast(Tuple!(Value, Value))(*cast(Value*)v.data[0], *cast(Value*)v.data[1]);
+}
+
+Value makeVectorValue(Value[] v) {
+  int size = v.length > MAX_VALUE_LENGTH ? MAX_VALUE_LENGTH : v.length;
+  Value ve = { data: v, header: size << 8 | ValueTag.Vector };
+  return ve;
+}
+
+bool valueIsVector(ref Value v) { return isValue(v, ValueTag.Vector); }
+
+Value[] valueToVector(ref Value v) {
+  return cast(Value[v.header >> 8])*v.data;
+}
+
+Value makeFunctionValue(void* f) {
+  Value v = { data: f, header: ValueTag.Function };
+  return v;
+}
+
+bool valueIsFunction(ref Value v) { return isValue(v, ValueTag.Function); }
+
+Value delegate(SExp*[], Context ctx) valueAsFunction(ref Value v) {
+  return cast(Value delegate(SExp*[], Context ctx))v.data;
+}
+
+Value[] sexpsToValues(Value delegate (SExp, Context) f, SExp*[] arguments, Context ctx) {
+  Value[arguments.length] result;
+
+  foreach (i, arg; arguments) {
+    result[i] = f(*arg, ctx);
   }
 
-  Value v;
-  v._integer = new int(i);
-  return v;
+  return result;
+}
+
+Value sexpsToValue(Value delegate (Value, SExp, Context) f, SExp*[] arguments, Context ctx, ref Value initial) {
+  Value result = initial;
+
+  foreach (arg; arguments) {
+    result = f(result, *arg, ctx, false);
+  }
+
+  return result;
+}
+
+Value plus(SExp*[] arguments, Context ctx) {
+  Value _plus(Value previous, SExp current, Context ctx) {
+    return valueAsInteger(previous) + valueAsInteger(interpret(current, ctx));
+  }
+  return sexpsToValue(_plus, arguments, ctx, makeIntegerValue(0));
 }
 
 Value times(SExp*[] arguments, Context ctx) {
-  int i = 1;
-
-  foreach (arg; arguments) {
-    i *= *(interpret(arg, ctx))._integer;
+  Value _times(Value previous, SExp current, Context ctx) {
+    return valueAsInteger(previous) * valueAsInteger(interpret(current, ctx));
   }
-
-  Value v;
-  v._integer = new int(i);
-  return v;
+  return sexpsToValue(_times, arguments, ctx, makeIntegerValue(0));
 }
 
 Value minus(SExp*[] arguments, Context ctx) {
-  int i = *(interpret(arguments[0], ctx))._integer;
-
-  foreach (arg; arguments[1 .. arguments.length]) {
-    i -= *(interpret(arg, ctx))._integer;
+  Value _minus(Value previous, SExp current, Context ctx) {
+    return valueAsInteger(previous) * valueAsInteger(interpret(current, ctx));
   }
-
-  Value v;
-  v._integer = new int(i);
-  return v;
+  return sexpsToValue(_minus,
+                      arguments[1 .. arguments.length],
+                      ctx,
+                      interpret(arguments[0], ctx));
 }
 
 Value let(SExp*[] arguments, Context ctx) {
@@ -360,9 +483,7 @@ Value lambda(SExp*[] arguments, Context ctx) {
     return interpret(funBody, newCtx);
   }
 
-  Value funValue;
-  funValue._fun = &defined;
-  return funValue;
+  return makeFunctionValue(&defined);
 }
 
 Value define(SExp*[] arguments, Context ctx) {
@@ -383,40 +504,30 @@ Value equals(SExp*[] arguments, Context ctx) {
   auto left = interpret(arguments[0], ctx);
   auto right = interpret(arguments[1], ctx);
 
-  Value v;
   bool b;
 
-  if (left._integer !is null) {
-    b = right._integer !is null && *(right._integer) == *(left._integer);
-  } else if (left._string !is null) {
-    b = right._string !is null && right._string == left._string;
-  } else if (left._symbol !is null) {
-    b = right._symbol !is null && right._symbol == left._symbol;
-  } else if (left._fun !is null) {
-    b = right._fun !is null && right._fun == left._fun;
-  } else if (left._bool !is null) {
-    b = right._bool !is null && *(right._bool) == *(left._bool);
+  if (valueIsInteger(left)) {
+    b = valueIsInteger(right) && valueToInteger(left) == valueToInteger(right);
+  } else if (valueIsString(left)) {
+    b = valueIsString(right) && valueToString(left) == valueToString(right);
+  } else if (valueIsSymbol(left)) {
+    b = valueIsSymbol(right) && valueToSymbol(left) == valueToSymbol(right);
+  } else if (valueIsFunction(left)) {
+    b = valueIsFunction(right) && valueToFunction(left) == valueToFunction(right);
+  } else if (valueIsBool(left)) {
+    b = valueIsBool(right) && valueToBool(left) == valueToBool(right);
   }
 
-  v._bool = new bool(b);
-  return v;
+  return makeBoolValue(b);
 }
 
 Value ifFun(SExp*[] arguments, Context ctx) {
   auto test = interpret(arguments[0], ctx);
-  auto ok = false;
-
-  if (test._integer !is null) {
-    ok = *(test._integer) != 0;
-  } else if (test._string !is null) {
-    ok = test._string.length != 0;
-  } else if (test._symbol !is null) {
-    ok = true;
-  } else if (test._fun !is null) {
-    ok = true;
-  } else if (test._bool !is null) {
-    ok = *test._bool;
-  }
+  auto ok = valueIsInteger(test) && valueToInteger(test) ||
+    valueIsString(test) && valueToString(test).length ||
+    valueIsSymbol(test) ||
+    valueIsFunction(test) ||
+    valueIsBool(test) && valueToBool(test);
 
   if (ok) {
     return interpret(arguments[1], ctx);
@@ -425,24 +536,24 @@ Value ifFun(SExp*[] arguments, Context ctx) {
   return interpret(arguments[2], ctx);
  }
 
-string valueToString(Value value) {
-  if (value._integer !is null) {
-    return format("%d", *(value._integer));
-  } else if (value._bool !is null) {
-    if (*(value._bool)) {
+string valueToString(Value v) {
+  if (valueIsInteger(v)) {
+    return format("%d", valueToInteger(v));
+  } else if (valueIsBool(v)) {
+    if (valueToBool(v)) {
       return "#t";
     }
 
     return "#f";
-  } else if (value._symbol !is null) {
-    return value._symbol;
-  } else if (value._string !is null) {
-    return value._string;
-  } else if (value._list !is null) {
-    return format("(%s . %s)", valueToString((*value._list)[0]), valueToString((*value._list)[1]));
-  } else if (value._nil) {
+  } else if (valueIsSymbol(v)) {
+    return valueToSymbol(v);
+  } else if (valueIsString(v)) {
+    return valueToString(V);
+  } else if (valueIsNil(v)) {
     return "'()";
   }
+
+  // TODO: support printing list and vector
 
   return format("unknown value (%s)", value);
 }
@@ -474,18 +585,16 @@ Value atomToValue(Token* atom) {
   string sValue = atom.value;
   switch (atom.schemeType) {
   case SchemeType.Integer:
-    int* i = new int(to!int(sValue));
-    v._integer = i;
+    v = makeBigIntegerValue(sValue);
     break;
   case SchemeType.String:
-    v._string = sValue;
+    v = makeStringValue(sValue);
     break;
   case SchemeType.Symbol:
-    v._symbol = sValue;
+    v = makeStringValue(sValue);
     break;
   case SchemeType.Bool:
-    bool* b = new bool(atom.value == "#t");
-    v._bool = b;
+    v = makeStringValue(sValue == "#t");
     break;
   default:
     return nilValue;
@@ -513,13 +622,9 @@ Value quote(SExp*[] arguments, Context ctx) {
     return quote(sexps, ctx);
   }
 
-  Value value;
-  Value *iterator = &value;
+  auto value = nilValue;
   foreach (argument; arguments) {
-    List* l = new List(quote([argument], ctx), nilValue);
-    (*iterator)._nil = false;
-    (*iterator)._list = l;
-    iterator = &((*l)[1]);
+    value = makeListValue(quote([argument], ctx), value);
   }
 
   return value;
@@ -529,14 +634,12 @@ Value cons(SExp*[] arguments, Context ctx) {
   auto first = interpret(arguments[0], ctx);
   auto second = interpret(arguments[1], ctx);
 
-  Value list;
-  list._list = new List(first, second);
-  return list;
+  return makeListValue(first, second);
 }
 
 Value car(SExp*[] arguments, Context ctx) {
   auto list = interpret(arguments[0], ctx);
-  return (*list._list)[0];
+  return valueToList(list)[1];
 }
 
 class Context {
@@ -576,7 +679,7 @@ class Context {
     Value value;
 
     if (key in this.builtins) {
-      value._fun = toDelegate(builtins[key]);
+      value = makeFunctionValue(toDelegate(builtins[key]));
     }
 
     if (key in this.map) {
@@ -601,8 +704,8 @@ Value interpret(SExp* sexp, Context ctx, bool topLevel) {
   if (isPrimitive) {
     Value v = atomToValue(sexp.atom);
 
-    if (v._symbol !is null) {
-      return ctx.get(v._symbol);
+    if (valueIsSymbol(v)) {
+      return ctx.get(valueToSymbol(v));
     }
 
     return v;
@@ -619,9 +722,9 @@ Value interpret(SExp* sexp, Context ctx, bool topLevel) {
       auto head = interpret(sexp.sexps[0], ctx);
       auto tail = sexp.sexps[1 .. sexp.sexps.length];
 
-      if (!head._nil) {
-        if (head._fun !is null) {
-          vs ~= head._fun(tail, ctx);
+      if (!valueIsNil(head)) {
+        if (valueIsFunction(head)) {
+          vs ~= valueToFunction(head)(tail, ctx);
         } else {
           error("Call of non-procedure", head);
         }
