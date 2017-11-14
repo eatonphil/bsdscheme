@@ -319,6 +319,8 @@ int valueToInteger(ref Value v) {
   return cast(int)v.data;
 }
 
+Value zeroValue = makeIntegerValue(0);
+
 Value makeBoolValue(bool b) {
   Value v = { data: cast(void*)b, header: ValueTag.Bool };
   return v;
@@ -344,9 +346,8 @@ BigInt valueToBigInteger(ref Value v) {
 static const int MAX_VALUE_LENGTH = uint.sizeof - 1;
 
 Value makeStringValue(string s) {
-  int size = s.length > MAX_VALUE_LENGTH ? MAX_VALUE_LENGTH : s.length;
-  void* sp = new string(s);
-  Value v = { data: s, header: size << 8 | ValueTag.String };
+  int size = cast(int)(s.length > MAX_VALUE_LENGTH ? MAX_VALUE_LENGTH : s.length);
+  Value v = { data: cast(void*)s.ptr, header: size << 8 | ValueTag.String };
   return v;
 }
 
@@ -373,28 +374,30 @@ string valueToSymbol(ref Value v) {
 Value makeListValue(ref Value head, ref Value tail) {
   Value v;
   v.header = ValueTag.List;
-  v.data = new void*[2];
-  v.data[0] = head;
-  v.data[1] = tail;
+  auto tuple = new void*[2];
+  tuple[0] = new Value(head.header, head.data);
+  tuple[1] = new Value(tail.header, tail.data);
+  v.data = tuple.ptr;
   return v;
 }
 
 bool valueIsList(ref Value v) { return isValue(v, ValueTag.List); }
 
 Tuple!(Value, Value) valueToList(Value v) {
-  return cast(Tuple!(Value, Value))(*cast(Value*)v.data[0], *cast(Value*)v.data[1]);
+  auto list = cast(Tuple!(Value, Value)*)v.data;
+  return *list;
 }
 
 Value makeVectorValue(Value[] v) {
-  int size = v.length > MAX_VALUE_LENGTH ? MAX_VALUE_LENGTH : v.length;
-  Value ve = { data: v, header: size << 8 | ValueTag.Vector };
+  int size = cast(int)(v.length > MAX_VALUE_LENGTH ? MAX_VALUE_LENGTH : v.length);
+  Value ve = { data: v.ptr, header: size << 8 | ValueTag.Vector };
   return ve;
 }
 
 bool valueIsVector(ref Value v) { return isValue(v, ValueTag.Vector); }
 
 Value[] valueToVector(ref Value v) {
-  return cast(Value[v.header >> 8])*v.data;
+  return *cast(Value[]*)v.data;
 }
 
 Value makeFunctionValue(void* f) {
@@ -404,12 +407,15 @@ Value makeFunctionValue(void* f) {
 
 bool valueIsFunction(ref Value v) { return isValue(v, ValueTag.Function); }
 
-Value delegate(SExp*[], Context ctx) valueAsFunction(ref Value v) {
-  return cast(Value delegate(SExp*[], Context ctx))v.data;
+Value delegate(SExp*[], Context ctx) valueToFunction(ref Value v) {
+  Value delegate(SExp*[], Context ctx) f;
+  f.ptr = v.data;
+  return f;
 }
 
 Value[] sexpsToValues(Value delegate (SExp, Context) f, SExp*[] arguments, Context ctx) {
-  Value[arguments.length] result;
+  Value[] result;
+  result.length = arguments.length;
 
   foreach (i, arg; arguments) {
     result[i] = f(*arg, ctx);
@@ -418,38 +424,40 @@ Value[] sexpsToValues(Value delegate (SExp, Context) f, SExp*[] arguments, Conte
   return result;
 }
 
-Value sexpsToValue(Value delegate (Value, SExp, Context) f, SExp*[] arguments, Context ctx, ref Value initial) {
+Value sexpsToValue(Value delegate (Value, Value) f, SExp*[] arguments, Context ctx, ref Value initial) {
   Value result = initial;
 
   foreach (arg; arguments) {
-    result = f(result, *arg, ctx, false);
+    result = f(result, interpret(arg, ctx));
   }
 
   return result;
 }
 
 Value plus(SExp*[] arguments, Context ctx) {
-  Value _plus(Value previous, SExp current, Context ctx) {
-    return valueAsInteger(previous) + valueAsInteger(interpret(current, ctx));
+  Value _plus(Value previous, Value current) {
+    int sum = valueToInteger(previous) + valueToInteger(current);
+    return makeIntegerValue(sum);
   }
-  return sexpsToValue(_plus, arguments, ctx, makeIntegerValue(0));
+  return sexpsToValue(&_plus, arguments, ctx, zeroValue);
 }
 
 Value times(SExp*[] arguments, Context ctx) {
-  Value _times(Value previous, SExp current, Context ctx) {
-    return valueAsInteger(previous) * valueAsInteger(interpret(current, ctx));
+  Value _times(Value previous, Value current) {
+    int product = valueToInteger(previous) * valueToInteger(current);
+    return makeIntegerValue(product);
   }
-  return sexpsToValue(_times, arguments, ctx, makeIntegerValue(0));
+  return sexpsToValue(&_times, arguments, ctx, zeroValue);
 }
 
 Value minus(SExp*[] arguments, Context ctx) {
-  Value _minus(Value previous, SExp current, Context ctx) {
-    return valueAsInteger(previous) * valueAsInteger(interpret(current, ctx));
+  Value _minus(Value previous, Value current) {
+    int difference = valueToInteger(previous) * valueToInteger(current);
+    return makeIntegerValue(difference);
   }
-  return sexpsToValue(_minus,
-                      arguments[1 .. arguments.length],
-                      ctx,
-                      interpret(arguments[0], ctx));
+  auto initial = interpret(arguments[0], ctx);
+  auto rest = arguments[1 .. arguments.length];
+  return sexpsToValue(&_minus, rest, ctx, initial);
 }
 
 Value let(SExp*[] arguments, Context ctx) {
@@ -483,7 +491,7 @@ Value lambda(SExp*[] arguments, Context ctx) {
     return interpret(funBody, newCtx);
   }
 
-  return makeFunctionValue(&defined);
+  return makeFunctionValue(toDelegate(&defined).ptr);
 }
 
 Value define(SExp*[] arguments, Context ctx) {
@@ -548,14 +556,14 @@ string valueToString(Value v) {
   } else if (valueIsSymbol(v)) {
     return valueToSymbol(v);
   } else if (valueIsString(v)) {
-    return valueToString(V);
+    return valueToString(v);
   } else if (valueIsNil(v)) {
     return "'()";
   }
 
   // TODO: support printing list and vector
 
-  return format("unknown value (%s)", value);
+  return format("unknown value (%s)", v);
 }
 
 Value display(SExp*[] arguments, Context ctx) {
@@ -594,7 +602,7 @@ Value atomToValue(Token* atom) {
     v = makeStringValue(sValue);
     break;
   case SchemeType.Bool:
-    v = makeStringValue(sValue == "#t");
+    v = makeBoolValue(sValue == "#t");
     break;
   default:
     return nilValue;
@@ -624,7 +632,8 @@ Value quote(SExp*[] arguments, Context ctx) {
 
   auto value = nilValue;
   foreach (argument; arguments) {
-    value = makeListValue(quote([argument], ctx), value);
+    auto head = quote([argument], ctx);
+    value = makeListValue(head, value);
   }
 
   return value;
@@ -679,7 +688,7 @@ class Context {
     Value value;
 
     if (key in this.builtins) {
-      value = makeFunctionValue(toDelegate(builtins[key]));
+      value = makeFunctionValue(toDelegate(builtins[key]).ptr);
     }
 
     if (key in this.map) {
