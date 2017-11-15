@@ -674,6 +674,11 @@ Value car(SExp*[] arguments, Context ctx) {
   return valueToList(list)[0];
 }
 
+Value cdr(SExp*[] arguments, Context ctx) {
+  auto list = interpret(arguments[0], ctx);
+  return valueToList(list)[1];
+}
+
 class Context {
   Value[string] map;
   Value function(SExp*[], Context)[string] builtins;
@@ -694,6 +699,7 @@ class Context {
       "quote": &quote,
       "cons": &cons,
       "car": &car,
+      "cdr": &cdr,
     ];
   }
 
