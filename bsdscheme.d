@@ -437,12 +437,12 @@ Value delegate(SExp*[], Context) valueToFunction(ref Value v) {
   return f;
 }
 
-Value[] sexpsToValues(Value delegate(SExp, Context) f, SExp*[] arguments, Context ctx) {
+Value[] sexpsToValues(Value delegate(SExp*[], Context) f, SExp*[] arguments, Context ctx) {
   Value[] result;
   result.length = arguments.length;
 
   foreach (i, arg; arguments) {
-    result[i] = f(*arg, ctx);
+    result[i] = f([arg], ctx);
   }
 
   return result;
@@ -471,7 +471,9 @@ Value times(SExp*[] arguments, Context ctx) {
     int product = valueToInteger(previous) * valueToInteger(current);
     return makeIntegerValue(product);
   }
-  return sexpsToValue(&_times, arguments, ctx, zeroValue);
+  auto initial = interpret(arguments[0], ctx);
+  auto rest = arguments[1 .. arguments.length];
+  return sexpsToValue(&_times, rest, ctx, initial);
 }
 
 Value minus(SExp*[] arguments, Context ctx) {
@@ -538,16 +540,24 @@ Value equals(SExp*[] arguments, Context ctx) {
 
   bool b;
 
-  if (valueIsInteger(left)) {
+  switch (tagOfValue(left)) {
+  case ValueTag.Integer:
     b = valueIsInteger(right) && valueToInteger(left) == valueToInteger(right);
-  } else if (valueIsString(left)) {
+    break;
+  case ValueTag.String:
     b = valueIsString(right) && valueToString(left) == valueToString(right);
-  } else if (valueIsSymbol(left)) {
+    break;
+  case ValueTag.Symbol:
     b = valueIsSymbol(right) && valueToSymbol(left) == valueToSymbol(right);
-  } else if (valueIsFunction(left)) {
+    break;
+  case ValueTag.Function:
     b = valueIsFunction(right) && valueToFunction(left) == valueToFunction(right);
-  } else if (valueIsBool(left)) {
+    break;
+  case ValueTag.Bool:
     b = valueIsBool(right) && valueToBool(left) == valueToBool(right);
+    break;
+  default:
+    b = false;
   }
 
   return makeBoolValue(b);
@@ -583,6 +593,8 @@ string stringOfValue(ref Value v) {
   case ValueTag.List:
     auto list = valueToList(v);
     return format("(%s . %s)", stringOfValue(list[0]), stringOfValue(list[1]));
+  case ValueTag.Function:
+    return format("Function(%s)", v);
   default:
     // TODO: support printing vector
     return format("unknown value (%s)", v);
