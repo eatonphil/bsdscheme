@@ -4,6 +4,7 @@ import std.conv;
 import std.file;
 import std.format;
 import std.functional;
+import std.math;
 import std.stdint;
 import std.stdio;
 import std.string;
@@ -283,6 +284,8 @@ void print(SExp* sexp) {
 
 alias Tuple!(Value, Value) List;
 
+static const int HEADER_TAG_WIDTH = 8;
+
 struct Value {
   uint header;
   void* data;
@@ -300,8 +303,12 @@ enum ValueTag {
   Function,
 }
 
+ValueTag tagOfValue(ref Value v) {
+  return cast(ValueTag)(v.header & (pow(2, HEADER_TAG_WIDTH) - 1));
+}
+
 bool isValue(ref Value v, ValueTag vt) {
-  return (v.header & 31) == vt;
+  return tagOfValue(v) == vt;
 }
 
 bool valueIsNil(ref Value v) { return isValue(v, ValueTag.Nil); }
@@ -354,7 +361,7 @@ Value makeStringValue(string s) {
   }
   heapString[size - 1] = '\0';
 
-  Value v = { data: cast(void*)heapString, header: size << 8 | ValueTag.String };
+  Value v = { data: cast(void*)heapString, header: size << HEADER_TAG_WIDTH | ValueTag.String };
   return v;
 }
 
@@ -366,8 +373,8 @@ string valueToString(ref Value v) {
 
 Value makeSymbolValue(string s) {
   Value v = makeStringValue(s);
-  v.header >>= 8;
-  v.header <<= 8;
+  v.header >>= HEADER_TAG_WIDTH;
+  v.header <<= HEADER_TAG_WIDTH;
   v.header |= ValueTag.Symbol;
   return v;
 }
@@ -382,8 +389,11 @@ Value makeListValue(ref Value head, ref Value tail) {
   Value v;
   v.header = ValueTag.List;
   Value** tuple = cast(Value**)malloc((Value*).sizeof * 2);
-  tuple[0] = new Value(head.header, head.data);
-  tuple[1] = new Value(tail.header, tail.data);
+  foreach (i, item; [head, tail]) {
+    tuple[i] = new Value;
+    tuple[i].header = item.header;
+    tuple[i].data = item.data;
+  }
   v.data = cast(void*)tuple;
   return v;
 }
@@ -391,14 +401,13 @@ Value makeListValue(ref Value head, ref Value tail) {
 bool valueIsList(ref Value v) { return isValue(v, ValueTag.List); }
 
 Tuple!(Value, Value) valueToList(Value v) {
-  Value[2] tuple;
-  Value* m = cast(Value*)v.data;
-  return Tuple!(Value, Value)(m[0], m[1]);
+  Value** m = cast(Value**)v.data;
+  return Tuple!(Value, Value)(*m[0], *m[1]);
 }
 
 Value makeVectorValue(Value[] v) {
   int size = cast(int)(v.length > MAX_VALUE_LENGTH ? MAX_VALUE_LENGTH : v.length);
-  Value ve = { data: v.ptr, header: size << 8 | ValueTag.Vector };
+  Value ve = { data: v.ptr, header: size << HEADER_TAG_WIDTH | ValueTag.Vector };
   return ve;
 }
 
@@ -559,31 +568,30 @@ Value ifFun(SExp*[] arguments, Context ctx) {
   return interpret(arguments[2], ctx);
  }
 
-string formatValue(Value v) {
-  if (valueIsInteger(v)) {
+string stringOfValue(ref Value v) {
+  switch (tagOfValue(v)) {
+  case ValueTag.Integer:
     return format("%d", valueToInteger(v));
-  } else if (valueIsBool(v)) {
-    if (valueToBool(v)) {
-      return "#t";
-    }
-
-    return "#f";
-  } else if (valueIsSymbol(v)) {
+  case ValueTag.Bool:
+    return valueToBool(v) ? "#t" : "#f";
+  case ValueTag.Symbol:
     return valueToSymbol(v);
-  } else if (valueIsString(v)) {
+  case ValueTag.String:
     return valueToString(v);
-  } else if (valueIsNil(v)) {
+  case ValueTag.Nil:
     return "'()";
+  case ValueTag.List:
+    auto list = valueToList(v);
+    return format("(%s . %s)", stringOfValue(list[0]), stringOfValue(list[1]));
+  default:
+    // TODO: support printing vector
+    return format("unknown value (%s)", v);
   }
-
-  // TODO: support printing list and vector
-
-  return format("unknown value (%s)", v);
 }
 
 Value display(SExp*[] arguments, Context ctx) {
   auto value = interpret(arguments[0], ctx);
-  write(formatValue(value));
+  write(stringOfValue(value));
   return nilValue;
 }
 
@@ -715,7 +723,7 @@ class Context {
 }
 
 void error(string msg, Value value) {
-  writeln(format("[ERROR] %s: %s", msg, formatValue(value)));
+  writeln(format("[ERROR] %s: %s", msg, stringOfValue(value)));
   exit(1);
 }
 
@@ -750,7 +758,6 @@ Value interpret(SExp* sexp, Context ctx, bool topLevel) {
         if (valueIsFunction(head)) {
           auto fn = valueToFunction(head);
           vs ~= fn(tail, ctx);
-
         } else {
           error("Call of non-procedure", head);
         }
