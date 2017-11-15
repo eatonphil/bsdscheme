@@ -287,8 +287,8 @@ alias Tuple!(Value, Value) List;
 static const int HEADER_TAG_WIDTH = 8;
 
 struct Value {
-  uint header;
-  void* data;
+  long header;
+  long data;
 }
 
 enum ValueTag {
@@ -313,23 +313,23 @@ bool isValue(ref Value v, ValueTag vt) {
 
 bool valueIsNil(ref Value v) { return isValue(v, ValueTag.Nil); }
 
-Value nilValue = { data: null, header: ValueTag.Nil };
+Value nilValue = { data: 0, header: ValueTag.Nil };
 
-Value makeIntegerValue(int i) {
-  Value v = { data: cast(void*)i, header: ValueTag.Integer };
+Value makeIntegerValue(long i) {
+  Value v = { data: i, header: ValueTag.Integer };
   return v;
 }
 
 bool valueIsInteger(ref Value v) { return isValue(v, ValueTag.Integer); }
 
-int valueToInteger(ref Value v) {
-  return cast(int)v.data;
+long valueToInteger(ref Value v) {
+  return cast(long)v.data;
 }
 
 Value zeroValue = makeIntegerValue(0);
 
 Value makeBoolValue(bool b) {
-  Value v = { data: cast(void*)b, header: ValueTag.Bool };
+  Value v = { data: b, header: ValueTag.Bool };
   return v;
 }
 
@@ -340,7 +340,7 @@ bool valueToBool(ref Value v) {
 }
 
 Value makeBigIntegerValue(string i) {
-  Value v = { data: new BigInt(i), header: ValueTag.BigInteger };
+  Value v = { data: cast(long)new BigInt(i), header: ValueTag.BigInteger };
   return v;
 }
 
@@ -350,10 +350,10 @@ BigInt valueToBigInteger(ref Value v) {
   return *cast(BigInt*)v.data;
 }
 
-static const int MAX_VALUE_LENGTH = (uint.sizeof * 8) - 1;
+static const long MAX_VALUE_LENGTH = (long.sizeof * 8) - 1;
 
 Value makeStringValue(string s) {
-  int size = cast(int)(s.length + 1 > MAX_VALUE_LENGTH ? MAX_VALUE_LENGTH : s.length + 1);
+  ulong size = s.length + 1 > MAX_VALUE_LENGTH ? MAX_VALUE_LENGTH : s.length + 1;
 
   auto heapString = new char[size];
   foreach (i, c; s[0 .. size - 1]) {
@@ -361,7 +361,7 @@ Value makeStringValue(string s) {
   }
   heapString[size - 1] = '\0';
 
-  Value v = { data: cast(void*)heapString, header: size << HEADER_TAG_WIDTH | ValueTag.String };
+  Value v = { data: cast(long)cast(void*)heapString, header: size << HEADER_TAG_WIDTH | ValueTag.String };
   return v;
 }
 
@@ -394,7 +394,7 @@ Value makeListValue(ref Value head, ref Value tail) {
     tuple[i].header = item.header;
     tuple[i].data = item.data;
   }
-  v.data = cast(void*)tuple;
+  v.data = cast(long)tuple;
   return v;
 }
 
@@ -406,8 +406,8 @@ Tuple!(Value, Value) valueToList(Value v) {
 }
 
 Value makeVectorValue(Value[] v) {
-  int size = cast(int)(v.length > MAX_VALUE_LENGTH ? MAX_VALUE_LENGTH : v.length);
-  Value ve = { data: v.ptr, header: size << HEADER_TAG_WIDTH | ValueTag.Vector };
+  ulong size = v.length > MAX_VALUE_LENGTH ? MAX_VALUE_LENGTH : v.length;
+  Value ve = { data: cast(long)v.ptr, header: size << HEADER_TAG_WIDTH | ValueTag.Vector };
   return ve;
 }
 
@@ -420,10 +420,10 @@ Value[] valueToVector(ref Value v) {
 Value makeFunctionValue(Value delegate(SExp*[], Context) f) {
   Value v;
   v.header = ValueTag.Function;
-  void** tuple = cast(void**)malloc((void*).sizeof * 2);
-  tuple[0] = f.ptr;
-  tuple[1] = f.funcptr;
-  v.data = cast(void*)tuple;
+  long* tuple = cast(long*)malloc((long).sizeof * 2);
+  tuple[0] = cast(long)f.ptr;
+  tuple[1] = cast(long)f.funcptr;
+  v.data = cast(long)tuple;
   return v;
 }
 
@@ -431,8 +431,8 @@ bool valueIsFunction(ref Value v) { return isValue(v, ValueTag.Function); }
 
 Value delegate(SExp*[], Context) valueToFunction(ref Value v) {
   Value delegate(SExp*[], Context) f;
-  void** tuple = cast(void**)v.data;
-  f.ptr = tuple[0];
+  long* tuple = cast(long*)v.data;
+  f.ptr = cast(void*)tuple[0];
   f.funcptr = cast(Value function(SExp*[], Context))(tuple[1]);
   return f;
 }
@@ -460,7 +460,7 @@ Value sexpsToValue(Value delegate(Value, Value) f, SExp*[] arguments, Context ct
 
 Value plus(SExp*[] arguments, Context ctx) {
   Value _plus(Value previous, Value current) {
-    int sum = valueToInteger(previous) + valueToInteger(current);
+    long sum = valueToInteger(previous) + valueToInteger(current);
     return makeIntegerValue(sum);
   }
   return sexpsToValue(&_plus, arguments, ctx, zeroValue);
@@ -468,7 +468,7 @@ Value plus(SExp*[] arguments, Context ctx) {
 
 Value times(SExp*[] arguments, Context ctx) {
   Value _times(Value previous, Value current) {
-    int product = valueToInteger(previous) * valueToInteger(current);
+    long product = valueToInteger(previous) * valueToInteger(current);
     return makeIntegerValue(product);
   }
   auto initial = interpret(arguments[0], ctx);
@@ -478,7 +478,7 @@ Value times(SExp*[] arguments, Context ctx) {
 
 Value minus(SExp*[] arguments, Context ctx) {
   Value _minus(Value previous, Value current) {
-    int difference = valueToInteger(previous) - valueToInteger(current);
+    long difference = valueToInteger(previous) - valueToInteger(current);
     return makeIntegerValue(difference);
   }
   auto initial = interpret(arguments[0], ctx);
