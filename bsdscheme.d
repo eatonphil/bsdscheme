@@ -671,7 +671,7 @@ Value cons(SExp*[] arguments, Context ctx) {
 
 Value car(SExp*[] arguments, Context ctx) {
   auto list = interpret(arguments[0], ctx);
-  return valueToList(list)[1];
+  return valueToList(list)[0];
 }
 
 class Context {
