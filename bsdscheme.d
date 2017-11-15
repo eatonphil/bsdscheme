@@ -301,14 +301,14 @@ enum ValueTag {
 }
 
 bool isValue(ref Value v, ValueTag vt) {
-  return (v.header & 32) == vt;
+  return (v.header & 31) == vt;
 }
 
 bool valueIsNil(ref Value v) { return isValue(v, ValueTag.Nil); }
 
 Value nilValue = { data: null, header: ValueTag.Nil };
 
-Value makeIntegerValue(uint i) {
+Value makeIntegerValue(int i) {
   Value v = { data: cast(void*)i, header: ValueTag.Integer };
   return v;
 }
@@ -343,18 +343,25 @@ BigInt valueToBigInteger(ref Value v) {
   return *cast(BigInt*)v.data;
 }
 
-static const int MAX_VALUE_LENGTH = uint.sizeof - 1;
+static const int MAX_VALUE_LENGTH = (uint.sizeof * 8) - 1;
 
 Value makeStringValue(string s) {
-  int size = cast(int)(s.length > MAX_VALUE_LENGTH ? MAX_VALUE_LENGTH : s.length);
-  Value v = { data: cast(void*)s.ptr, header: size << 8 | ValueTag.String };
+  int size = cast(int)(s.length + 1 > MAX_VALUE_LENGTH ? MAX_VALUE_LENGTH : s.length + 1);
+
+  auto heapString = new char[size];
+  foreach (i, c; s[0 .. size - 1]) {
+    heapString[i] = c;
+  }
+  heapString[size - 1] = '\0';
+
+  Value v = { data: cast(void*)heapString, header: size << 8 | ValueTag.String };
   return v;
 }
 
 bool valueIsString(ref Value v) { return isValue(v, ValueTag.String); }
 
 string valueToString(ref Value v) {
-  return *cast(string*)v.data;
+  return fromStringz(cast(char*)v.data).dup;
 }
 
 Value makeSymbolValue(string s) {
@@ -374,18 +381,19 @@ string valueToSymbol(ref Value v) {
 Value makeListValue(ref Value head, ref Value tail) {
   Value v;
   v.header = ValueTag.List;
-  auto tuple = new void*[2];
+  Value** tuple = cast(Value**)malloc((Value*).sizeof * 2);
   tuple[0] = new Value(head.header, head.data);
   tuple[1] = new Value(tail.header, tail.data);
-  v.data = tuple.ptr;
+  v.data = cast(void*)tuple;
   return v;
 }
 
 bool valueIsList(ref Value v) { return isValue(v, ValueTag.List); }
 
 Tuple!(Value, Value) valueToList(Value v) {
-  auto list = cast(Tuple!(Value, Value)*)v.data;
-  return *list;
+  Value[2] tuple;
+  Value* m = cast(Value*)v.data;
+  return Tuple!(Value, Value)(m[0], m[1]);
 }
 
 Value makeVectorValue(Value[] v) {
@@ -400,20 +408,27 @@ Value[] valueToVector(ref Value v) {
   return *cast(Value[]*)v.data;
 }
 
-Value makeFunctionValue(void* f) {
-  Value v = { data: f, header: ValueTag.Function };
+Value makeFunctionValue(Value delegate(SExp*[], Context) f) {
+  Value v;
+  v.header = ValueTag.Function;
+  void** tuple = cast(void**)malloc((void*).sizeof * 2);
+  tuple[0] = f.ptr;
+  tuple[1] = f.funcptr;
+  v.data = cast(void*)tuple;
   return v;
 }
 
 bool valueIsFunction(ref Value v) { return isValue(v, ValueTag.Function); }
 
-Value delegate(SExp*[], Context ctx) valueToFunction(ref Value v) {
-  Value delegate(SExp*[], Context ctx) f;
-  f.ptr = v.data;
+Value delegate(SExp*[], Context) valueToFunction(ref Value v) {
+  Value delegate(SExp*[], Context) f;
+  void** tuple = cast(void**)v.data;
+  f.ptr = tuple[0];
+  f.funcptr = cast(Value function(SExp*[], Context))(tuple[1]);
   return f;
 }
 
-Value[] sexpsToValues(Value delegate (SExp, Context) f, SExp*[] arguments, Context ctx) {
+Value[] sexpsToValues(Value delegate(SExp, Context) f, SExp*[] arguments, Context ctx) {
   Value[] result;
   result.length = arguments.length;
 
@@ -424,7 +439,7 @@ Value[] sexpsToValues(Value delegate (SExp, Context) f, SExp*[] arguments, Conte
   return result;
 }
 
-Value sexpsToValue(Value delegate (Value, Value) f, SExp*[] arguments, Context ctx, ref Value initial) {
+Value sexpsToValue(Value delegate(Value, Value) f, SExp*[] arguments, Context ctx, ref Value initial) {
   Value result = initial;
 
   foreach (arg; arguments) {
@@ -491,7 +506,7 @@ Value lambda(SExp*[] arguments, Context ctx) {
     return interpret(funBody, newCtx);
   }
 
-  return makeFunctionValue(toDelegate(&defined).ptr);
+  return makeFunctionValue(&defined);
 }
 
 Value define(SExp*[] arguments, Context ctx) {
@@ -544,7 +559,7 @@ Value ifFun(SExp*[] arguments, Context ctx) {
   return interpret(arguments[2], ctx);
  }
 
-string valueToString(Value v) {
+string formatValue(Value v) {
   if (valueIsInteger(v)) {
     return format("%d", valueToInteger(v));
   } else if (valueIsBool(v)) {
@@ -568,7 +583,7 @@ string valueToString(Value v) {
 
 Value display(SExp*[] arguments, Context ctx) {
   auto value = interpret(arguments[0], ctx);
-  write(valueToString(value));
+  write(formatValue(value));
   return nilValue;
 }
 
@@ -593,13 +608,13 @@ Value atomToValue(Token* atom) {
   string sValue = atom.value;
   switch (atom.schemeType) {
   case SchemeType.Integer:
-    v = makeBigIntegerValue(sValue);
+    v = makeIntegerValue(to!int(sValue));
     break;
   case SchemeType.String:
     v = makeStringValue(sValue);
     break;
   case SchemeType.Symbol:
-    v = makeStringValue(sValue);
+    v = makeSymbolValue(sValue);
     break;
   case SchemeType.Bool:
     v = makeBoolValue(sValue == "#t");
@@ -688,7 +703,7 @@ class Context {
     Value value;
 
     if (key in this.builtins) {
-      value = makeFunctionValue(toDelegate(builtins[key]).ptr);
+      value = makeFunctionValue(toDelegate(builtins[key]));
     }
 
     if (key in this.map) {
@@ -700,7 +715,7 @@ class Context {
 }
 
 void error(string msg, Value value) {
-  writeln(format("[ERROR] %s: %s", msg, valueToString(value)));
+  writeln(format("[ERROR] %s: %s", msg, formatValue(value)));
   exit(1);
 }
 
@@ -733,7 +748,9 @@ Value interpret(SExp* sexp, Context ctx, bool topLevel) {
 
       if (!valueIsNil(head)) {
         if (valueIsFunction(head)) {
-          vs ~= valueToFunction(head)(tail, ctx);
+          auto fn = valueToFunction(head);
+          vs ~= fn(tail, ctx);
+
         } else {
           error("Call of non-procedure", head);
         }
