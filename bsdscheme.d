@@ -476,7 +476,7 @@ Value times(SExp*[] arguments, Context ctx) {
 
 Value minus(SExp*[] arguments, Context ctx) {
   Value _minus(Value previous, Value current) {
-    int difference = valueToInteger(previous) * valueToInteger(current);
+    int difference = valueToInteger(previous) - valueToInteger(current);
     return makeIntegerValue(difference);
   }
   auto initial = interpret(arguments[0], ctx);
