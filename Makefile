@@ -1,6 +1,6 @@
-.PHONY: all clean
+.PHONY: clean
 
-all: bin/bsdscheme
+default: bin/bsdscheme
 
 bin/bsdscheme: src/bsdscheme.d src/lex.d src/parse.d src/value.d src/runtime.d src/interpret.d src/utility.d
 	mkdir -p bin
