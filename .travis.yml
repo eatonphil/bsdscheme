@@ -10,7 +10,7 @@ script:
     - sudo ln -s `which $DC` /usr/local/bin/ldc
 
     # bsdscheme
-    - ldc bsdscheme.d
+    - make
     - sudo ln -s $PWD/bsdscheme /usr/local/bin/bsdscheme
 
     # crystal
