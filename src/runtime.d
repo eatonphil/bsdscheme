@@ -1,3 +1,4 @@
+import std.bigint;
 import std.conv;
 import std.format;
 import std.functional;
@@ -31,26 +32,107 @@ Value sexpsToValue(Value delegate(Value, Value) f, SExp*[] arguments, Context ct
 
 Value plus(SExp*[] arguments, Context ctx) {
   Value _plus(Value previous, Value current) {
-    long sum = valueToInteger(previous) + valueToInteger(current);
-    return makeIntegerValue(sum);
+    if (valueIsBigInteger(previous) || valueIsBigInteger(current)) {
+      BigInt a, b;
+
+      if (valueIsBigInteger(previous)) {
+        a = valueToBigInteger(previous);
+      } else {
+        a = BigInt(valueToInteger(previous));
+      }
+
+      if (valueIsBigInteger(current)) {
+        b = valueToBigInteger(current);
+      } else {
+        b = BigInt(valueToInteger(current));
+      }
+
+      return makeBigIntegerValue(a + b);
+    }
+
+    long a = valueToInteger(previous);
+    long b = valueToInteger(current);
+
+    if (b > 0 && a > long.max - b ||
+        b < 0 && a < long.max - b) {
+      BigInt bA = BigInt(a);
+      BigInt bB = BigInt(b);
+      return makeBigIntegerValue(bA + bB);
+    }
+
+    return makeIntegerValue(a + b);
   }
   return sexpsToValue(&_plus, arguments, ctx, zeroValue);
 }
 
 Value times(SExp*[] arguments, Context ctx) {
   Value _times(Value previous, Value current) {
-    long product = valueToInteger(previous) * valueToInteger(current);
-    return makeIntegerValue(product);
+    if (valueIsBigInteger(previous) || valueIsBigInteger(current)) {
+      BigInt a, b;
+
+      if (valueIsBigInteger(previous)) {
+        a = valueToBigInteger(previous);
+      } else {
+        a = BigInt(valueToInteger(previous));
+      }
+
+      if (valueIsBigInteger(current)) {
+        b = valueToBigInteger(current);
+      } else {
+        b = BigInt(valueToInteger(current));
+      }
+
+      return makeBigIntegerValue(a * b);
+    }
+
+    long a = valueToInteger(previous);
+    long b = valueToInteger(current);
+
+    if (a > long.max / b) {
+      BigInt bA = BigInt(a);
+      BigInt bB = BigInt(b);
+      return makeBigIntegerValue(bA * bB);
+    }
+
+    return makeIntegerValue(a * b);
   }
   auto initial = interpret(arguments[0], ctx);
   auto rest = arguments[1 .. arguments.length];
   return sexpsToValue(&_times, rest, ctx, initial);
 }
 
+// TODO: unify plus and minus
 Value minus(SExp*[] arguments, Context ctx) {
   Value _minus(Value previous, Value current) {
-    long difference = valueToInteger(previous) - valueToInteger(current);
-    return makeIntegerValue(difference);
+    if (valueIsBigInteger(previous) || valueIsBigInteger(current)) {
+      BigInt a, b;
+
+      if (valueIsBigInteger(previous)) {
+        a = valueToBigInteger(previous);
+      } else {
+        a = BigInt(valueToInteger(previous));
+      }
+
+      if (valueIsBigInteger(current)) {
+        b = valueToBigInteger(current);
+      } else {
+        b = BigInt(valueToInteger(current));
+      }
+
+      return makeBigIntegerValue(a - b);
+    }
+
+    long a = valueToInteger(previous);
+    long b = valueToInteger(current);
+
+    if (b > 0 && a > long.max - b ||
+        b < 0 && a < long.max - b) {
+      BigInt bA = BigInt(a);
+      BigInt bB = BigInt(b);
+      return makeBigIntegerValue(bA - bB);
+    }
+
+    return makeIntegerValue(a - b);
   }
   auto initial = interpret(arguments[0], ctx);
   auto rest = arguments[1 .. arguments.length];
@@ -152,7 +234,7 @@ Value ifFun(SExp*[] arguments, Context ctx) {
 string stringOfValue(ref Value v) {
   switch (tagOfValue(v)) {
   case ValueTag.Integer:
-    return format("%d", valueToInteger(v));
+    return to!(string)(valueToInteger(v));
   case ValueTag.Bool:
     return valueToBool(v) ? "#t" : "#f";
   case ValueTag.Symbol:
@@ -166,6 +248,9 @@ string stringOfValue(ref Value v) {
     return format("(%s . %s)", stringOfValue(list[0]), stringOfValue(list[1]));
   case ValueTag.Function:
     return format("Function(%s)", v);
+  case ValueTag.BigInteger:
+    writeln("I got ehre");
+    return valueToBigInteger(v).toDecimalString();
   default:
     // TODO: support printing vector
     return format("unknown value (%s)", v);

@@ -9,7 +9,8 @@ import runtime;
 
 alias Tuple!(Value, Value) List;
 
-static const int HEADER_TAG_WIDTH = 8;
+static const long WORD_SIZE = 64;
+static const int HEADER_TAG_WIDTH = WORD_SIZE / 8;
 
 struct Value {
   long header;
@@ -64,7 +65,7 @@ bool valueToBool(ref Value v) {
   return cast(bool)v.data;
 }
 
-Value makeBigIntegerValue(string i) {
+Value makeBigIntegerValue(BigInt i) {
   Value v = { data: cast(long)new BigInt(i), header: ValueTag.BigInteger };
   return v;
 }
