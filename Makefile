@@ -1,10 +1,13 @@
-.PHONY: clean
+.PHONY: install uninstall clean
 
-default: bin/bsdscheme
-
-bin/bsdscheme: src/bsdscheme.d src/lex.d src/parse.d src/value.d src/runtime.d src/interpret.d src/utility.d
-	mkdir -p bin
+bin/bsdscheme: src/*.d
 	ldc2 -of $@ $^
+
+install:
+	ln -s $(CURDIR)/bin/bsdscheme /usr/local/bin/bsdscheme
+
+uninstall:
+	rm /usr/local/bin/bsdscheme
 
 clean:
 	rm -rf bin
