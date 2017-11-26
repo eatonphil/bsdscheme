@@ -6,4 +6,4 @@ cases:
 templates:
 - test.scm: |
 
-    (display (car (quote (+ 1 2))))
+    (display (car (cdr (quote (1 + 2)))))

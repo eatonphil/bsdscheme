@@ -10,8 +10,7 @@ script:
     - sudo ln -s `which $DC` /usr/local/bin/ldc
 
     # bsdscheme
-    - ldc bsdscheme.d
-    - sudo ln -s $PWD/bsdscheme /usr/local/bin/bsdscheme
+    - make && sudo make install
 
     # crystal
     - curl https://dist.crystal-lang.org/apt/setup.sh | sudo bash

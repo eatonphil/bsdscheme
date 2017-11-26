@@ -1,7 +1,18 @@
 cases:
-  - name: recursive function
+  - name: simple recursion
     status: 0
-    stdout: 27
+    stdout: 81
+
+    b: 3
+    p: 4
+
+  - name: max int recursion (sign is wrong but fine for now)
+    status: 0
+    stdout: -9223372036854775808
+
+    b: 2
+    p: 63
+    
 
 templates:
 - test.scm: |
@@ -11,4 +22,4 @@ templates:
           1
           (* base (exp base (- pow 1)))))
     
-    (display (exp 3 3))
+    (display (exp {{ b }} {{ p }}))
