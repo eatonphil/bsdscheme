@@ -6,12 +6,19 @@ cases:
     b: 3
     p: 4
 
-  - name: max int recursion (sign is wrong but fine for now)
+  - name: max fixed int recursion
     status: 0
-    stdout: -9223372036854775808
+    stdout: 4611686018427387904
 
     b: 2
-    p: 63
+    p: 62
+
+  - name: big int recursion
+    status: 0
+    stdout: 18446744073709551616
+
+    b: 2
+    p: 64
     
 
 templates:
