@@ -8,7 +8,7 @@ This is a Scheme interpreter written in D intended to eventually target Scheme R
 
 ```
 $ brew install ldc
-$ ldc bsdscheme.d
+$ make
 ```
 
 ## Example
@@ -22,7 +22,7 @@ $ cat test/exp.scm
 
 (display (exp 3 3))
 (newline)
-$ ./bsdscheme test/exp.scm
+$ ./bin/bsdscheme test/exp.scm
 27
 ```
 
