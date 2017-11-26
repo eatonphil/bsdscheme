@@ -249,7 +249,6 @@ string stringOfValue(ref Value v) {
   case ValueTag.Function:
     return format("Function(%s)", v);
   case ValueTag.BigInteger:
-    writeln("I got ehre");
     return valueToBigInteger(v).toDecimalString();
   default:
     // TODO: support printing vector
