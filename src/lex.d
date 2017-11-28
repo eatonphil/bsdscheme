@@ -187,3 +187,7 @@ TokenBuffer lex(StringBuffer input) {
 
   return tokens;
 }
+
+TokenBuffer lex(char[] input) {
+  return lex(new StringBuffer(input));
+}

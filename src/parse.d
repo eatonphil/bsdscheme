@@ -1,15 +1,13 @@
 import std.typecons;
+import std.conv;
+import std.stdio;
 
 import lex;
+import value;
+import utility;
 
-alias Token Atom;
-
-struct SExp {
-  Atom* atom;
-  SExp*[] sexps;
-}
-
-Tuple!(Token*[], SExp*) parse(Token*[] tokens, SExp* sexp) {
+Tuple!(Token*[], Value) parse(Token*[] tokens) {
+  Value list;
   int i = 0;
 
   while (true) {
@@ -22,48 +20,50 @@ Tuple!(Token*[], SExp*) parse(Token*[] tokens, SExp* sexp) {
     switch (token.type) {
     case TokenType.LeftParen:
       auto program = parse(tokens[i + 1 .. tokens.length]);
-      sexp.sexps ~= program[1];
-      tokens = program[0];
+      auto tmp = program[1];
+      list = appendList(list, makeListValue(tmp, nilValue));
       i = -1;
+      tokens = program[0];
       break;
     case TokenType.RightParen:
-      return Tuple!(Token*[], SExp*)(tokens[i + 1 .. tokens.length], sexp);
+      return Tuple!(Token*[], Value)(tokens[i + 1 .. tokens.length], list);
       break;
     case TokenType.Quote:
-      auto quoteSexp = new SExp;
-
-      auto quote = new SExp;
-      quote.atom = new Token(0, 0, "", "quote", TokenType.Quote, SchemeType.Symbol);
+      Value quote = makeSymbolValue("quote");
 
       auto program = parse(tokens[i + 1 .. tokens.length]);
-
-      quoteSexp.sexps ~= quote;
-      quoteSexp.sexps ~= program[1];
-      sexp.sexps ~= quoteSexp;
+      auto quoted = makeListValue(quote, program[1]);
+      list = appendList(list, makeListValue(quoted, nilValue));
 
       tokens = [new Token(0, 0, "", ")", TokenType.RightParen)];
       foreach (nextToken; program[0]) {
         tokens ~= nextToken;
       }
+
       i = -1;
       break;
     default:
-      auto atom = new SExp;
-      atom.atom = token;
-      (*sexp).sexps ~= atom;
-      break;
+      Value atom;
+      switch (token.schemeType) {
+      case SchemeType.Bool:
+        atom = makeBoolValue(token.value == "#t");
+        break;
+      case SchemeType.Integer:
+        atom = makeIntegerValue(to!int(token.value));
+        break;
+      default:
+        atom = makeSymbolValue(token.value);
+        break;
+      }
+      list = appendList(list, makeListValue(atom, nilValue));
     }
 
     i += 1;
   }
 
   if (i > 0) {
-    return Tuple!(Token*[], SExp*)(tokens[i + 1 .. tokens.length], sexp);
+    return Tuple!(Token*[], Value)(tokens[i + 1 .. tokens.length], list);
   }
 
-  return Tuple!(Token*[], SExp*)([], sexp);
-}
-
-Tuple!(Token*[], SExp*) parse(Token*[] tokens) {
-  return parse(tokens, new SExp);
+  return Tuple!(Token*[], Value)([], list);
 }
