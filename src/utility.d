@@ -6,23 +6,29 @@ import parse;
 import runtime;
 import value;
 
-void print(SExp* sexp) {
-  if (sexp is null) {
-    return;
+Value appendList(Value l1, Value l2) {
+  if (valueIsNil(l1)) {
+    return l2;
   }
 
-  if (sexp.atom !is null) {
-    writef("%s ", sexp.atom.value);
-    return;
+  auto tuple = valueToList(l1);
+  Value car = tuple[0];
+  Value cdr = appendList(tuple[1], l2);
+  return makeListValue(car, cdr);
+}
+
+Value reverseList(Value value) {
+  if (valueIsList(value)) {
+    auto tuple = valueToList(value);
+    return appendList(reverseList(tuple[1]),
+                      makeListValue(tuple[0], nilValue));
   }
 
-  if (sexp.sexps !is null) {
-    writef("(");
-    foreach (ref _sexp; sexp.sexps) {
-      print(_sexp);
-    }
-    writef(")");
-  }
+  return value;
+}
+
+void print(Value value) {
+  write(stringOfValue(value));
 }
 
 void error(string msg, Value value) {

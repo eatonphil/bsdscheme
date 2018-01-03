@@ -15,7 +15,7 @@ cases:
 
   - name: big int recursion
     status: 0
-    stdout: 18446744073709551616
+    stdout: "18446744073709551616"
 
     b: 2
     p: 64
@@ -24,7 +24,7 @@ cases:
 templates:
 - test.scm: |
 
-    (define exp (base pow)
+    (define (exp base pow)
       (if (= pow 0)
           1
           (* base (exp base (- pow 1)))))

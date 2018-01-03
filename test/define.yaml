@@ -6,6 +6,6 @@ cases:
 templates:
 - test.scm: |
 
-    (define myfun (a b) (+ a b))
+    (define (myfun a b) (+ a b))
 
     (display (myfun 21 9))

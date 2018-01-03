@@ -3,11 +3,9 @@ import std.bigint;
 import std.math;
 import std.string;
 import std.typecons;
+import std.stdio;
 
-import parse;
-import runtime;
-
-alias Tuple!(Value, Value) List;
+import runtime : Context;
 
 static const long WORD_SIZE = 64;
 static const int HEADER_TAG_WIDTH = WORD_SIZE / 8;
@@ -78,7 +76,7 @@ BigInt valueToBigInteger(ref Value v) {
 
 static const long MAX_VALUE_LENGTH = (long.sizeof * 8) - 1;
 
-Value makeStringValue(string s) {
+Tuple!(void*, ulong) copyString(string s) {
   ulong size = s.length + 1 > MAX_VALUE_LENGTH ? MAX_VALUE_LENGTH : s.length + 1;
 
   auto heapString = new char[size];
@@ -86,8 +84,12 @@ Value makeStringValue(string s) {
     heapString[i] = c;
   }
   heapString[size - 1] = '\0';
+  return Tuple!(void*, ulong)(cast(void*)heapString, size);
+}
 
-  Value v = { data: cast(long)cast(void*)heapString, header: size << HEADER_TAG_WIDTH | ValueTag.String };
+Value makeStringValue(string s) {
+  auto string = copyString(s);
+  Value v = { data: cast(long)string[0], header: string[1] << HEADER_TAG_WIDTH | ValueTag.String };
   return v;
 }
 
@@ -143,22 +145,29 @@ Value[] valueToVector(ref Value v) {
   return *cast(Value[]*)v.data;
 }
 
-Value makeFunctionValue(Value delegate(SExp*[], Context) f) {
+Value makeFunctionValue(string name, Value delegate(Value, Context) f, bool special) {
+  void* namePtr = copyString(name)[0];
   Value v;
   v.header = ValueTag.Function;
-  long* tuple = cast(long*)malloc((long).sizeof * 2);
-  tuple[0] = cast(long)f.ptr;
-  tuple[1] = cast(long)f.funcptr;
+  long* tuple = cast(long*)malloc((long).sizeof * 3);
+  tuple[0] = cast(long)namePtr;
+  tuple[0] <<= HEADER_TAG_WIDTH;
+  tuple[0] |= cast(int)special;
+  tuple[1] = cast(long)f.ptr;
+  tuple[2] = cast(long)f.funcptr;
   v.data = cast(long)tuple;
   return v;
 }
 
 bool valueIsFunction(ref Value v) { return isValue(v, ValueTag.Function); }
 
-Value delegate(SExp*[], Context) valueToFunction(ref Value v) {
-  Value delegate(SExp*[], Context) f;
+Tuple!(string, Value delegate(Value, Context), bool) valueToFunction(ref Value v) {
+  Value delegate(Value, Context) f;
   long* tuple = cast(long*)v.data;
-  f.ptr = cast(void*)tuple[0];
-  f.funcptr = cast(Value function(SExp*[], Context))(tuple[1]);
-  return f;
+  bool special = cast(bool)(tuple[0] & (pow(2, HEADER_TAG_WIDTH) - 1));
+  void* namePtr = cast(void*)(tuple[0] >> HEADER_TAG_WIDTH);
+  string name = fromStringz(cast(char*)namePtr).dup;
+  f.ptr = cast(void*)tuple[1];
+  f.funcptr = cast(Value function(Value, Context))(tuple[2]);
+  return Tuple!(string, Value delegate(Value, Context), bool)(name, f, special);
 }

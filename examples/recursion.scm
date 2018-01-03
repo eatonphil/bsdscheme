@@ -1,4 +1,4 @@
-(define exp (base pow)
+(define (exp base pow)
   (if (= pow 0)
       1
       (* base (exp base (- pow 1)))))

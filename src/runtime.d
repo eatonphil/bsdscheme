@@ -2,35 +2,42 @@ import std.bigint;
 import std.conv;
 import std.format;
 import std.functional;
-import std.stdio;
+import std.stdio : write;
+import std.typecons;
 
 import lex;
 import parse;
 import value;
-import interpret : interpret;
+import utility;
 
-Value[] sexpsToValues(Value delegate(SExp*[], Context) f, SExp*[] arguments, Context ctx) {
-  Value[] result;
-  result.length = arguments.length;
-
-  foreach (i, arg; arguments) {
-    result[i] = f([arg], ctx);
-  }
-
-  return result;
-}
-
-Value sexpsToValue(Value delegate(Value, Value) f, SExp*[] arguments, Context ctx, ref Value initial) {
+Value reduceValues(Value delegate(Value, Value) f, Value arguments, Context ctx, ref Value initial) {
   Value result = initial;
+  auto tmp = arguments;
 
-  foreach (arg; arguments) {
-    result = f(result, interpret(arg, ctx));
+  while (valueIsList(tmp)) {
+    auto tuple = valueToList(tmp);
+    result = f(result, tuple[0]);
+    tmp = tuple[1];
   }
 
   return result;
 }
 
-Value plus(SExp*[] arguments, Context ctx) {
+Value mapValues(Value delegate(Value, Context) f, Value arguments, Context ctx) {
+  Value mapped;
+  auto tmp = arguments;
+
+  while (valueIsList(tmp)) {
+    auto tuple = valueToList(tmp);
+    Value mappedElement = f(tuple[0], ctx);
+    mapped = appendList(mapped, makeListValue(mappedElement, nilValue));
+    tmp = tuple[1];
+  }
+
+  return mapped;
+}
+
+Value plus(Value arguments, Context ctx) {
   Value _plus(Value previous, Value current) {
     if (valueIsBigInteger(previous) || valueIsBigInteger(current)) {
       BigInt a, b;
@@ -62,10 +69,11 @@ Value plus(SExp*[] arguments, Context ctx) {
 
     return makeIntegerValue(a + b);
   }
-  return sexpsToValue(&_plus, arguments, ctx, zeroValue);
+
+  return reduceValues(&_plus, arguments, ctx, zeroValue);
 }
 
-Value times(SExp*[] arguments, Context ctx) {
+Value times(Value arguments, Context ctx) {
   Value _times(Value previous, Value current) {
     if (valueIsBigInteger(previous) || valueIsBigInteger(current)) {
       BigInt a, b;
@@ -96,13 +104,13 @@ Value times(SExp*[] arguments, Context ctx) {
 
     return makeIntegerValue(a * b);
   }
-  auto initial = interpret(arguments[0], ctx);
-  auto rest = arguments[1 .. arguments.length];
-  return sexpsToValue(&_times, rest, ctx, initial);
+
+  auto tuple = valueToList(arguments);
+  return reduceValues(&_times, tuple[1], ctx, tuple[0]);
 }
 
 // TODO: unify plus and minus
-Value minus(SExp*[] arguments, Context ctx) {
+Value minus(Value arguments, Context ctx) {
   Value _minus(Value previous, Value current) {
     if (valueIsBigInteger(previous) || valueIsBigInteger(current)) {
       BigInt a, b;
@@ -134,62 +142,96 @@ Value minus(SExp*[] arguments, Context ctx) {
 
     return makeIntegerValue(a - b);
   }
-  auto initial = interpret(arguments[0], ctx);
-  auto rest = arguments[1 .. arguments.length];
-  return sexpsToValue(&_minus, rest, ctx, initial);
+
+  auto tuple = valueToList(arguments);
+  return reduceValues(&_minus, tuple[1], ctx, tuple[0]);
 }
 
-Value let(SExp*[] arguments, Context ctx) {
-  auto bindings = arguments[0].sexps;
-  auto letBody = arguments[1];
+Value let(Value arguments, Context ctx) {
+  auto tuple = valueToList(arguments);
+  auto bindings = tuple[0];
+  auto letBody = car(tuple[1]);
 
   Context newCtx = ctx.dup();
 
-  foreach (binding; bindings) {
-    auto key = binding.sexps[0].atom.value;
-    auto value = binding.sexps[1];
-    newCtx.set(key, interpret(value, ctx));
+  auto tmp = valueToList(bindings);
+  while (true) {
+    auto bindingTuple = valueToList(tmp[0]);
+    auto key = valueToSymbol(bindingTuple[0]);
+    auto value = eval(car(bindingTuple[1]), ctx);
+    newCtx.set(key, value);
+
+    if (valueIsList(tmp[1])) {
+      tmp = valueToList(tmp[1]);
+    } else {
+      break;
+    }
   }
 
-  return interpret(letBody, newCtx);
+  return eval(letBody, newCtx);
 }
 
-Value lambda(SExp*[] arguments, Context ctx) {
-  auto funArguments = arguments[0].sexps;
-  auto funBody = arguments[1];
+Value namedLambda(Value arguments, Context ctx, string name) {
+  auto tuple = valueToList(arguments);
+  auto funArguments = tuple[0];
+  auto funBody = valueToList(tuple[1])[0];
 
-  Value defined(SExp*[] parameters, Context ctx) {
+  Value defined(Value parameters, Context ctx) {
     Context newCtx = ctx.dup();
 
-    for (int i = 0; i < funArguments.length; i++) {
-      auto key = funArguments[i].atom.value;
-      auto value = parameters[i];
-      newCtx.set(key, interpret(value, ctx));
+    auto keyTmp = valueToList(funArguments);
+    auto valueTmp = valueToList(parameters);
+    while (true) {
+      auto key = valueToSymbol(keyTmp[0]);
+      auto value = eval(valueTmp[0], ctx);
+
+      newCtx.set(key, value);
+
+      // TODO: handle arg count mismatch
+      if (valueIsList(keyTmp[1])) {
+        keyTmp = valueToList(keyTmp[1]);
+        valueTmp = valueToList(valueTmp[1]);
+      } else {
+        break;
+      }
     }
 
-    return interpret(funBody, newCtx);
+    return eval(funBody, newCtx);
   }
 
-  return makeFunctionValue(&defined);
+  return makeFunctionValue(name, &defined, false);
 }
 
-Value define(SExp*[] arguments, Context ctx) {
-  auto name = arguments[0].atom.value;
-  Value value;
+Value lambda(Value arguments, Context ctx) {
+  return namedLambda(arguments, ctx, "lambda");
+}
 
-  if (arguments.length > 2) {
-    value = lambda(arguments[1 .. arguments.length], ctx);
-  } else {
-    value = interpret(arguments[1], ctx);
+Value define(Value arguments, Context ctx) {
+  auto tuple = valueToList(arguments);
+  auto name = valueToSymbol(tuple[0]);
+  Value value = nilValue;
+
+  // (define (a b) b)
+  if (valueIsList(tuple[0])) {
+    auto nameTuple = valueToList(tuple[0]);
+    name = valueToSymbol(nameTuple[0]);
+    value = namedLambda(makeListValue(nameTuple[1], tuple[1]), ctx, name);
+  } else { // (define a)
+    if (valueIsNil(tuple[1])) {
+      error("expected value to bind to symbol", tuple[0]);
+    } else { // (define a 4)
+      value = eval(valueToList(tuple[1])[0], ctx);
+    }
   }
 
   ctx.set(name, value);
   return value;
 }
 
-Value equals(SExp*[] arguments, Context ctx) {
-  auto left = interpret(arguments[0], ctx);
-  auto right = interpret(arguments[1], ctx);
+Value equals(Value arguments, Context ctx) {
+  auto tuple = valueToList(arguments);
+  auto left = tuple[0];
+  auto right = car(tuple[1]);
 
   bool b;
 
@@ -204,7 +246,7 @@ Value equals(SExp*[] arguments, Context ctx) {
     b = valueIsSymbol(right) && valueToSymbol(left) == valueToSymbol(right);
     break;
   case ValueTag.Function:
-    b = valueIsFunction(right) && valueToFunction(left) == valueToFunction(right);
+    b = valueIsFunction(right) && valueToFunction(left)[1] == valueToFunction(right)[1];
     break;
   case ValueTag.Bool:
     b = valueIsBool(right) && valueToBool(left) == valueToBool(right);
@@ -216,19 +258,21 @@ Value equals(SExp*[] arguments, Context ctx) {
   return makeBoolValue(b);
 }
 
-Value ifFun(SExp*[] arguments, Context ctx) {
-  auto test = interpret(arguments[0], ctx);
+Value ifFun(Value arguments, Context ctx) {
+  auto tuple = valueToList(arguments);
+  auto test = eval(tuple[0], ctx);
   auto ok = valueIsInteger(test) && valueToInteger(test) ||
     valueIsString(test) && valueToString(test).length ||
     valueIsSymbol(test) ||
     valueIsFunction(test) ||
     valueIsBool(test) && valueToBool(test);
 
+  tuple = valueToList(tuple[1]);
   if (ok) {
-    return interpret(arguments[1], ctx);
+    return eval(tuple[0], ctx);
   }
 
-  return interpret(arguments[2], ctx);
+  return eval(car(tuple[1]), ctx);
  }
 
 string stringOfValue(ref Value v) {
@@ -242,131 +286,160 @@ string stringOfValue(ref Value v) {
   case ValueTag.String:
     return valueToString(v);
   case ValueTag.Nil:
-    return "'()";
+    return "()";
   case ValueTag.List:
-    auto list = valueToList(v);
-    return format("(%s . %s)", stringOfValue(list[0]), stringOfValue(list[1]));
+    auto fmt = "(";
+    auto tuple = valueToList(v);
+
+    while (true) {
+      fmt = format("%s%s", fmt, stringOfValue(tuple[0]));
+
+      if (valueIsList(tuple[1])) {
+        tuple = valueToList(tuple[1]);
+        fmt = format("%s ", fmt);
+      } else if (valueIsNil(tuple[1])) {
+        break;
+      } else {
+        fmt = format("%s . %s", fmt, stringOfValue(tuple[1]));
+        break;
+      }
+    }
+
+    return format("%s)", fmt);
+    break;
   case ValueTag.Function:
-    return format("Function(%s)", v);
+    return "#<procedure>";
   case ValueTag.BigInteger:
     return valueToBigInteger(v).toDecimalString();
   default:
     // TODO: support printing vector
-    return format("unknown value (%s)", v);
+    return format("#<%d>", tagOfValue(v));
   }
 }
 
-Value display(SExp*[] arguments, Context ctx) {
-  auto value = interpret(arguments[0], ctx);
-  write(stringOfValue(value));
+Value display(Value arguments, Context ctx) {
+  Value head = car(arguments);
+  write(stringOfValue(head));
   return nilValue;
 }
 
-Value newline(SExp*[] arguments, Context ctx) {
+Value newline(Value arguments, Context ctx) {
   write("\n");
   return nilValue;
 }
 
-Value setFun(SExp*[] arguments, Context ctx) {
-  auto name = arguments[0].atom.value;
-  auto value = interpret(arguments[1], ctx);
+Value setFun(Value arguments, Context ctx) {
+  auto tuple = valueToList(arguments);
+  auto name = valueToSymbol(tuple[0]);
+  auto value = eval(car(tuple[1]), ctx);
   ctx.set(name, value);
   return value;
 }
 
-Value atomToValue(Atom* atom) {
-  if (atom is null) {
-    return nilValue;
-  }
-
-  Value v;
-  string sValue = atom.value;
-  switch (atom.schemeType) {
-  case SchemeType.Integer:
-    v = makeIntegerValue(to!int(sValue));
-    break;
-  case SchemeType.String:
-    v = makeStringValue(sValue);
-    break;
-  case SchemeType.Symbol:
-    v = makeSymbolValue(sValue);
-    break;
-  case SchemeType.Bool:
-    v = makeBoolValue(sValue == "#t");
-    break;
-  default:
-    return nilValue;
-    break;
-  }
-
-  return v;
+Value quote(Value arguments, Context ctx) {
+  return car(arguments);
 }
 
-Value quote(SExp*[] arguments, Context ctx) {
-  if (arguments.length == 0) {
-    // TODO: probs should be an error?
-    return nilValue;
+Value cons(Value arguments, Context ctx) {
+  return arguments;
+}
+
+Value car(Value arguments) {
+  return valueToList(arguments)[0];
+}
+
+Value _car(Value arguments, Context ctx) {
+  return car(car(arguments));
+}
+
+Value cdr(Value arguments, Context ctx) {
+  return valueToList(car(arguments))[1];
+}
+
+Value begin(Value arguments, Context ctx) {
+  // TODO: rewrite using reduce.
+  Value result = arguments;
+  auto tmp = valueToList(arguments);
+
+  while (true) {
+    result = tmp[0];
+
+    if (valueIsList(tmp[1])) {
+      tmp = valueToList(tmp[1]);
+    } else {
+      break;
+    }
   }
 
-  // TODO: handle arguments[0] is nilish?
-  if (arguments.length == 1) {
-    auto atom = arguments[0].atom;
-    auto sexps = arguments[0].sexps;
-    bool isPrimitive = sexps is null;
-    if (isPrimitive) {
-      return atomToValue(atom);
+  return result;
+}
+
+Value eval(Value value, Context ctx) {
+  switch (tagOfValue(value)) {
+  case ValueTag.Symbol:
+    return ctx.get(valueToSymbol(value));
+    break;
+  case ValueTag.List:
+    auto v = valueToList(value);
+
+    auto car = eval(v[0], ctx);
+    auto cdr = v[1];
+
+    if (!valueIsFunction(car)) {
+      error("Call of non-procedure", car);
+      return nilValue;
     }
 
-    return quote(sexps, ctx);
+    auto fn = valueToFunction(car);
+    string fnName = fn[0];
+    auto fnDelegate = fn[1];
+    bool fnIsSpecial = fn[2];
+
+    auto args = v[1];
+    // Evaluate all arguments unless this is a special function.
+    if (!fnIsSpecial) {
+      args = mapValues(toDelegate(&eval), args, ctx);
+    }
+
+    return fnDelegate(args, ctx);
+    break;
+  default:
+    return value;
+    break;
   }
-
-  auto value = nilValue;
-  foreach (argument; arguments) {
-    auto head = quote([argument], ctx);
-    value = makeListValue(head, value);
-  }
-
-  return value;
 }
 
-Value cons(SExp*[] arguments, Context ctx) {
-  auto first = interpret(arguments[0], ctx);
-  auto second = interpret(arguments[1], ctx);
-
-  return makeListValue(first, second);
-}
-
-Value car(SExp*[] arguments, Context ctx) {
-  auto list = interpret(arguments[0], ctx);
-  return valueToList(list)[0];
-}
-
-Value cdr(SExp*[] arguments, Context ctx) {
-  auto list = interpret(arguments[0], ctx);
-  return valueToList(list)[1];
+Value _eval(Value arguments, Context ctx) {
+  return eval(eval(car(arguments), ctx), ctx);
 }
 
 class Context {
   Value[string] map;
-  Value function(SExp*[], Context)[string] builtins;
+  Value function(Value, Context)[string] builtins;
+  Value function(Value, Context)[string] builtinSpecials;
 
   this() {
     this.builtins = [
-      "if": &ifFun,
       "+": &plus,
       "-": &minus,
       "*": &times,
+      "=": &equals,
+      "cons": &cons,
+      "car": &_car,
+      "cdr": &cdr,
+      "begin": &begin,
+      "display": &display,
+      "newline": &newline,
+    ];
+
+    this.builtinSpecials = [
+      "if": &ifFun,
       "let": &let,
       "define": &define,
       "lambda": &lambda,
-      "=": &equals,
-      "newline": &newline,
-      "display": &display,
       "set!": &setFun,
+      "eval": &_eval,
       "quote": &quote,
-      "cons": &cons,
-      "car": &car,
-      "cdr": &cdr,
     ];
   }
 
@@ -383,12 +456,14 @@ class Context {
   Value get(string key) {
     Value value;
 
-    if (key in this.builtins) {
-      value = makeFunctionValue(toDelegate(builtins[key]));
+    if (key in builtins) {
+      value = makeFunctionValue(key, toDelegate(builtins[key]), false);
+    } else if (key in builtinSpecials) {
+      value = makeFunctionValue(key, toDelegate(builtinSpecials[key]), true);
     }
 
-    if (key in this.map) {
-      value = this.map[key];
+    if (key in map) {
+      value = map[key];
     }
 
     return value;
