@@ -1,4 +1,3 @@
-import core.stdc.stdlib;
 import std.bigint;
 import std.math;
 import std.string;
@@ -116,7 +115,7 @@ string valueToSymbol(ref Value v) {
 Value makeListValue(ref Value head, ref Value tail) {
   Value v;
   v.header = ValueTag.List;
-  Value** tuple = cast(Value**)malloc((Value*).sizeof * 2);
+  Value** tuple = cast(Value**)new Value*[2];
   foreach (i, item; [head, tail]) {
     tuple[i] = new Value;
     tuple[i].header = item.header;
@@ -149,7 +148,7 @@ Value makeFunctionValue(string name, Value delegate(Value, Context) f, bool spec
   void* namePtr = copyString(name)[0];
   Value v;
   v.header = ValueTag.Function;
-  long* tuple = cast(long*)malloc((long).sizeof * 3);
+  long* tuple = cast(long*)new long[3];
   tuple[0] = cast(long)namePtr;
   tuple[0] <<= HEADER_TAG_WIDTH;
   tuple[0] |= cast(int)special;
