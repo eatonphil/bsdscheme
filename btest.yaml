@@ -1,5 +1,5 @@
 test_path: test
 
 runners:
-  - name: bsi
-    run: bsdscheme test.scm
+  - name: bsdi
+    run: bsdi test.scm
