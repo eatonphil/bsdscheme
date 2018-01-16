@@ -1,11 +1,12 @@
 import std.conv;
 import std.string;
+import std.stdio;
 
 enum TokenType {
   LeftParen,
   RightParen,
   Quote,
-  Symbol,
+  Atom,
 }
 
 enum SchemeType {
@@ -80,16 +81,18 @@ class Buffer(T) {
 alias Buffer!(char) StringBuffer;
 
 Token* lexLeftParen(StringBuffer input) {
-  if (input.current() == '(') {
-    return new Token(0, 0, "", "(", TokenType.LeftParen);
+  char c = input.current();
+  if (c == '(' || c == '[') {
+    return new Token(0, 0, "", to!string(c), TokenType.LeftParen);
   }
 
   return null;
 }
 
 Token* lexRightParen(StringBuffer input) {
-  if (input.current() == ')') {
-    return new Token(0, 0, "", ")", TokenType.RightParen);
+  char c = input.current();
+  if (c == ')' || c == ']') {
+    return new Token(0, 0, "", to!string(c), TokenType.RightParen);
   }
 
   return null;
@@ -108,7 +111,7 @@ Token* lexBool(StringBuffer input) {
     input.next();
 
     if (input.current() == 't' || input.current() == 'f') {
-      return new Token(0, 0, "", "#", TokenType.Symbol, SchemeType.Bool);
+      return new Token(0, 0, "", "#", TokenType.Atom, SchemeType.Bool);
     }
 
     input.previous();
@@ -132,6 +135,9 @@ Token* lexSymbol(StringBuffer input) {
     case ' ':
     case '\n':
     case '\t':
+    case '"':
+    case '[':
+    case ']':
       break loop;
       break;
     default:
@@ -147,7 +153,34 @@ Token* lexSymbol(StringBuffer input) {
       schemeType = SchemeType.Integer;
     }
 
-    return new Token(0, 0, "", symbol, TokenType.Symbol, schemeType);
+    return new Token(0, 0, "", symbol, TokenType.Atom, schemeType);
+  }
+
+  return null;
+}
+
+Token* lexString(StringBuffer input) {
+  string s = "";
+
+  if (input.current() != '"') {
+    return null;
+  }
+
+  input.next();
+
+  do {
+    auto c = input.current();
+
+    if (c == '"') {
+      break;
+    }
+
+    s ~= to!string(c);
+  } while (input.next());
+
+  if (s.length) {
+    auto schemeType = SchemeType.String;
+    return new Token(0, 0, "", s, TokenType.Atom, schemeType);
   }
 
   return null;
@@ -178,6 +211,10 @@ TokenBuffer lex(StringBuffer input) {
 
     if (token is null) {
       token = lexBool(input);
+    }
+
+    if (token is null) {
+      token = lexString(input);
     }
 
     if (token !is null) {

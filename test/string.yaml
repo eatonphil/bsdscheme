@@ -1,0 +1,9 @@
+cases:
+  - name: basic
+    status: 0
+    stdout: "Hello world!"
+
+templates:
+- test.scm: |
+
+    (display "Hello world!")

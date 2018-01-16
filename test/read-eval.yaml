@@ -1,0 +1,9 @@
+cases:
+  - name: read and eval
+    status: 0
+    stdout: "3"
+
+templates:
+- test.scm: |
+
+    (display (eval (read "(+ 1 2)")))
