@@ -53,7 +53,8 @@ as any of it can be done at all.
 
 * Big numbers
 * Strings
-* Read / Eval
+* Read / eval
+* Line comments
 
 ## Testing
 

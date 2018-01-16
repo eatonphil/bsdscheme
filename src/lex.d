@@ -186,6 +186,18 @@ Token* lexString(StringBuffer input) {
   return null;
 }
 
+Token* lexComment(StringBuffer input) {
+  if (input.current() == ';') {
+    do {
+      if (input.current() == '\n') {
+        break;
+      }
+    } while (input.next());
+  }
+
+  return null;
+}
+
 alias Buffer!(Token*) TokenBuffer;
 
 TokenBuffer lex(StringBuffer input) {
@@ -215,6 +227,10 @@ TokenBuffer lex(StringBuffer input) {
 
     if (token is null) {
       token = lexString(input);
+    }
+
+    if (token is null) {
+      token = lexComment(input);
     }
 
     if (token !is null) {
