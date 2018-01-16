@@ -42,7 +42,7 @@ $ cat examples/read-eval.scm
 (display (eval (read "(+ 1 2)")))
 
 (newline)
-$ ./bin/bsdi examples.read-eval.scm
+$ ./bin/bsdi examples/read-eval.scm
 3
 ```
 
