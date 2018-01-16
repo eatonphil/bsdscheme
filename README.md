@@ -11,7 +11,16 @@ $ brew install ldc
 $ make
 ```
 
-## Example
+### FreeBSD
+
+```
+$ doas pkg install ldc
+$ make
+```
+
+## Examples
+
+### Recursion
 
 ```
 $ cat examples/recursion.scm
@@ -22,9 +31,29 @@ $ cat examples/recursion.scm
 
 (display (exp 2 64))
 (newline)
-$ ./bin/bsdscheme examples/exp.scm
+$ ./bin/bsdi examples/exp.scm
 18446744073709551616
 ```
+
+### Read/eval
+
+```
+$ cat examples/read-eval.scm
+(display (eval (read "(+ 1 2)")))
+
+(newline)
+$ ./bin/bsdi examples.read-eval.scm
+3
+```
+
+## Features
+
+This isn't so much "features" as in its done unique or well so much
+as any of it can be done at all.
+
+* Big numbers
+* Strings
+* Read / Eval
 
 ## Testing
 
