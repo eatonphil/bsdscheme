@@ -5,6 +5,7 @@ import std.functional;
 import std.stdio;
 
 import ast;
+import parse;
 import utility;
 
 import value;
@@ -375,6 +376,12 @@ Value _eval(Value arguments, Context ctx) {
   return eval(eval(car(arguments), ctx), ctx);
 }
 
+Value _read(Value arguments, Context ctx) {
+  auto v = car(arguments);
+  auto s = astToString(v);
+  return quote(parse.read(s.dup), ctx);
+}
+
 class Context {
   Value[string] map;
   Value function(Value, Context)[string] builtins;
@@ -382,27 +389,28 @@ class Context {
 
   this() {
     this.builtins = [
-                     "+": &plus,
-                     "-": &minus,
-                     "*": &times,
-                     "=": &equals,
-                     "cons": &cons,
-                     "car": &_car,
-                     "cdr": &cdr,
-                     "begin": &begin,
-                     "display": &display,
-                     "newline": &newline,
-                     ];
+      "+": &plus,
+      "-": &minus,
+      "*": &times,
+      "=": &equals,
+      "cons": &cons,
+      "car": &_car,
+      "cdr": &cdr,
+      "begin": &begin,
+      "display": &display,
+      "newline": &newline,
+      "read": &_read,
+    ];
 
     this.builtinSpecials = [
-                            "if": &ifFun,
-                            "let": &let,
-                            "define": &define,
-                            "lambda": &lambda,
-                            "set!": &setFun,
-                            "eval": &_eval,
-                            "quote": &quote,
-                            ];
+      "if": &ifFun,
+      "let": &let,
+      "define": &define,
+      "lambda": &lambda,
+      "set!": &setFun,
+      "eval": &_eval,
+      "quote": &quote,
+    ];
   }
 
   void set(string key, Value value) {
