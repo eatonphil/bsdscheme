@@ -1,37 +1,24 @@
-import core.stdc.stdlib;
-import std.format;
-import std.stdio;
+import ast;
 
-import parse;
-import runtime;
-import value;
+AST nil = { data: 0, header: ASTTag.Nil };
 
-Value appendList(Value l1, Value l2) {
-  if (valueIsNil(l1)) {
+AST appendList(AST l1, AST l2) {
+  if (astIsNil(l1)) {
     return l2;
   }
 
-  auto tuple = valueToList(l1);
-  Value car = tuple[0];
-  Value cdr = appendList(tuple[1], l2);
-  return makeListValue(car, cdr);
+  auto tuple = astToList(l1);
+  AST car = tuple[0];
+  AST cdr = appendList(tuple[1], l2);
+  return makeListAst(car, cdr);
 }
 
-Value reverseList(Value value) {
-  if (valueIsList(value)) {
-    auto tuple = valueToList(value);
+AST reverseList(AST value) {
+  if (astIsList(value)) {
+    auto tuple = astToList(value);
     return appendList(reverseList(tuple[1]),
-                      makeListValue(tuple[0], nilValue));
+                      makeListAst(tuple[0], nil));
   }
 
   return value;
-}
-
-void print(Value value) {
-  write(stringOfValue(value));
-}
-
-void error(string msg, Value value) {
-  writeln(format("[ERROR] %s: %s", msg, stringOfValue(value)));
-  exit(1);
 }
