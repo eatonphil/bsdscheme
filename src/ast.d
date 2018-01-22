@@ -6,7 +6,7 @@ import std.typecons;
 import std.stdio;
 
 static const long WORD_SIZE = 64;
-static const int HEADER_TAG_WIDTH = WORD_SIZE / 8;
+static const int HEADER_TAG_WIDTH = 8;
 
 enum ASTTag {
   Nil,
@@ -108,10 +108,10 @@ BigInt astToBigInteger(ref AST v) {
   return *cast(BigInt*)v.data;
 }
 
-static const long MAX_AST_LENGTH = (long.sizeof * 8) - 1;
+static const ulong MAX_VALUE_LENGTH = pow(2, WORD_SIZE) - 1;
 
 Tuple!(void*, ulong) copyString(string s) {
-  ulong size = s.length + 1 > MAX_AST_LENGTH ? MAX_AST_LENGTH : s.length + 1;
+  ulong size = s.length + 1 > MAX_VALUE_LENGTH ? MAX_VALUE_LENGTH : s.length + 1;
 
   auto heapString = new char[size];
   foreach (i, c; s[0 .. size - 1]) {
@@ -168,7 +168,7 @@ Tuple!(AST, AST) astToList(AST v) {
 }
 
 AST makeVectorAst(AST[] v) {
-  ulong size = v.length > MAX_AST_LENGTH ? MAX_AST_LENGTH : v.length;
+  ulong size = v.length > MAX_VALUE_LENGTH ? MAX_VALUE_LENGTH : v.length;
   AST ve = { data: cast(long)v.ptr, header: size << HEADER_TAG_WIDTH | ASTTag.Vector };
   return ve;
 }

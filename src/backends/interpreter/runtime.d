@@ -1,5 +1,6 @@
 import core.stdc.stdlib;
 import std.bigint;
+import std.file : read;
 import std.format;
 import std.functional;
 import std.stdio;
@@ -277,6 +278,7 @@ Value ifFun(Value arguments, Context ctx) {
     return eval(tuple[0], ctx);
   }
 
+  // TODO: support no second argument
   return eval(car(tuple[1]), ctx);
 }
 
@@ -377,9 +379,20 @@ Value _eval(Value arguments, Context ctx) {
 }
 
 Value _read(Value arguments, Context ctx) {
-  auto v = car(arguments);
-  auto s = astToString(v);
-  return quote(parse.read(s.dup), ctx);
+  Value arg1 = car(arguments);
+  string s = astToString(arg1);
+  string sWithBegin = format("(begin %s)", s);
+  return quote(parse.read(sWithBegin.dup), ctx);
+}
+
+Value include(Value arguments, Context ctx) {
+  Value arg1 = car(arguments);
+  string includeFile = astToString(arg1);
+  string fileContents = (cast(char[])read(includeFile)).dup;
+  Value source = makeStringAst(fileContents);
+  Value readArgs = makeListAst(source, nilValue);
+  Value parsed = _read(readArgs, ctx);
+  return eval(parsed, ctx);
 }
 
 class Context {
@@ -400,6 +413,7 @@ class Context {
       "display": &display,
       "newline": &newline,
       "read": &_read,
+      "include": &include,
     ];
 
     this.builtinSpecials = [
