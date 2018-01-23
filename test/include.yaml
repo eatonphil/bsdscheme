@@ -1,0 +1,16 @@
+cases:
+  - name: displays a string defined by in an included file
+    status: 0
+    stdout: This is my included string
+
+templates:
+- helper.scm: |
+
+    (define str "This is my included string")
+    
+- test.scm: |
+
+    (include "helper.scm")
+
+    (display str)
+
