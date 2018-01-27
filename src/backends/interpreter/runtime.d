@@ -178,9 +178,8 @@ Value let(Value arguments, Context ctx) {
 }
 
 Value namedLambda(Value arguments, Context ctx, string name) {
-  auto tuple = astToList(arguments);
-  auto funArguments = tuple[0];
-  auto funBody = astToList(tuple[1])[0];
+  auto funArguments = car(arguments);
+  auto funBody = cdr(arguments);
 
   Value defined(Value parameters, Context ctx) {
     Context newCtx = ctx.dup();
@@ -202,7 +201,9 @@ Value namedLambda(Value arguments, Context ctx, string name) {
       }
     }
 
-    return eval(funBody, newCtx);
+    auto begin = makeSymbolAst("begin");
+    auto withBegin = makeListAst(begin, funBody);
+    return eval(withBegin, newCtx);
   }
 
   return makeFunctionValue(name, &defined, false);
@@ -244,6 +245,9 @@ Value equals(Value arguments, Context ctx) {
   switch (tagOfAst(left)) {
   case ASTTag.Integer:
     b = astIsInteger(right) && astToInteger(left) == astToInteger(right);
+    break;
+  case ASTTag.Char:
+    b = astIsChar(right) && astToChar(left) == astToChar(right);
     break;
   case ASTTag.String:
     b = astIsString(right) && astToString(left) == astToString(right);
@@ -317,7 +321,11 @@ Value _car(Value arguments, Context ctx) {
   return car(car(arguments));
 }
 
-Value cdr(Value arguments, Context ctx) {
+Value cdr(Value arguments) {
+  return astToList(arguments)[1];
+}
+
+Value _cdr(Value arguments, Context ctx) {
   return astToList(car(arguments))[1];
 }
 
@@ -395,6 +403,109 @@ Value include(Value arguments, Context ctx) {
   return eval(parsed, ctx);
 }
 
+Value stringP(Value arguments, Context ctx) {
+  auto arg1 = car(arguments);
+  bool b = astIsString(arg1);
+  return makeBoolAst(b);
+}
+
+Value makeString(Value arguments, Context ctx) {
+  auto arg1 = car(arguments);
+  long k = astToInteger(arg1);
+  char[] s;
+  s.length = k;
+
+  char fill = '\0';
+
+  auto rest = cdr(arguments);
+  if (!astIsNil(rest)) {
+    auto arg2 = car(cdr(arguments));
+    fill = astToChar(arg2);
+  }
+
+  for (int i = 0; i < k; i++) {
+    s[i] = fill;
+  }
+
+  return makeStringAst(s.dup);
+}
+
+Value stringFun(Value arguments, Context ctx) {
+  string s = "";
+
+  auto iterator = arguments;
+  while (!astIsNil(iterator)) {
+    auto arg = car(iterator);
+    char c = astToChar(arg);
+    s ~= c;
+    iterator = cdr(iterator);
+  }
+
+  return makeStringAst(s);
+}
+
+Value stringLength(Value arguments, Context ctx) {
+  auto arg1 = car(arguments);
+  long l = astToString(arg1).length;
+  return makeIntegerAst(l);
+}
+
+Value stringRef(Value arguments, Context ctx) {
+  auto arg1 = car(arguments);
+  auto arg2 = car(cdr(arguments));
+  string s = astToString(arg1);
+  long i = astToInteger(arg2);
+  return makeCharAst(s[i]);
+}
+
+Value stringEquals(Value arguments, Context ctx) {
+  auto arg1 = car(arguments);
+  string s = astToString(arg1);
+
+  auto iterator = cdr(arguments);
+  while (!astIsNil(iterator)) {
+    auto arg = car(iterator);
+    if (s != astToString(arg)) {
+      return makeBoolAst(false);
+    }
+    iterator = cdr(iterator);
+  }
+
+  return makeBoolAst(true);
+}
+
+Value stringSet(Value arguments, Context ctx) {
+  auto arg1 = car(arguments);
+  auto symbol = astToSymbol(arg1);
+  auto value = eval(arg1, ctx);
+  char[] s = astToString(value).dup;
+  auto arg2 = eval(car(cdr(arguments)), ctx);
+  long k = astToInteger(arg2);
+  auto arg3 = eval(car(cdr(cdr(arguments))), ctx);
+  char c = astToChar(arg3);
+  s[k] = c;
+  value = makeStringAst(s.dup);
+  ctx.set(symbol, value);
+  return value;
+}
+
+Value stringAppend(Value arguments, Context ctx) {
+  string s = "";
+
+  auto iterator = arguments;
+  while (!astIsNil(iterator)) {
+    auto arg = car(iterator);
+    s ~= astToString(arg);
+    iterator = cdr(iterator);
+  }
+
+  return makeStringAst(s);
+}
+
+Value listToString(Value arguments, Context ctx) {
+  return stringFun(car(arguments), ctx);
+}
+
 class Context {
   Value[string] map;
   Value function(Value, Context)[string] builtins;
@@ -408,12 +519,29 @@ class Context {
       "=": &equals,
       "cons": &cons,
       "car": &_car,
-      "cdr": &cdr,
+      "cdr": &_cdr,
       "begin": &begin,
       "display": &display,
       "newline": &newline,
       "read": &_read,
       "include": &include,
+      "string?": &stringP,
+      "make-string": &makeString,
+      "string": &stringFun,
+      "string-length": &stringLength,
+      "string-ref": &stringRef,
+      "string=?": &stringEquals,
+      "string-append": &stringAppend,
+      "list->string": &listToString,
+      //"string-ci=?" &stringCIEquals,
+      //"string-upcase": &stringUpcase,
+      //"string-downcase": &stringDowncase,
+      //"string-foldcase": &stringFoldcase,
+      //"substring": &substring,
+      //"string->list": &stringToList,
+      //"string-copy": &stringCopy,
+      //"string-copy!" &stringCopyMut,
+      //"string-fill!": &stringFill,
     ];
 
     this.builtinSpecials = [
@@ -424,6 +552,7 @@ class Context {
       "set!": &setFun,
       "eval": &_eval,
       "quote": &quote,
+      "string-set!": &stringSet,
     ];
   }
 

@@ -11,6 +11,7 @@ enum TokenType {
 
 enum SchemeType {
   String,
+  Char,
   Symbol,
   Integer,
   Bool,
@@ -121,6 +122,23 @@ Token* lexBool(StringBuffer input) {
   return null;
 }
 
+Token* lexChar(StringBuffer input) {
+  if (input.current() == '#') {
+    input.next();
+
+    if (input.current() == '\\') {
+      input.next();
+
+      char[1] s = [input.current()];
+      return new Token(0, 0, "", s.dup, TokenType.Atom, SchemeType.Char);
+    }
+
+    input.previous();
+  }
+
+  return null;
+}
+
 Token* lexSymbol(StringBuffer input) {
   string symbol = "";
 
@@ -219,6 +237,10 @@ TokenBuffer lex(StringBuffer input) {
 
     if (token is null) {
       token = lexSymbol(input);
+    }
+
+    if (token is null) {
+      token = lexChar(input);
     }
 
     if (token is null) {

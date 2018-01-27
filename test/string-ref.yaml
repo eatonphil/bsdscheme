@@ -1,0 +1,9 @@
+cases:
+  - name: basic
+    status: 0
+    stdout: "#\e"
+
+templates:
+- test.scm: |
+
+    (display (string-ref "Hello world!" 1)

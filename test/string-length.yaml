@@ -1,0 +1,9 @@
+cases:
+  - name: basic
+    status: 0
+    stdout: 12
+
+templates:
+- test.scm: |
+
+    (display (string-length "Hello world!")

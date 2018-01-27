@@ -11,6 +11,7 @@ static const int HEADER_TAG_WIDTH = 8;
 enum ASTTag {
   Nil,
   Integer,
+  Char,
   Bool,
   BigInteger,
   String,
@@ -33,6 +34,8 @@ string formatAst(AST v) {
     return astToBool(v) ? "#t" : "#f";
   case ASTTag.Symbol:
     return astToSymbol(v);
+  case ASTTag.Char:
+    return format("#\\%c", astToChar(v));
   case ASTTag.String:
     return astToString(v);
   case ASTTag.Nil:
@@ -84,6 +87,17 @@ bool astIsInteger(ref AST v) { return isAst(v, ASTTag.Integer); }
 
 long astToInteger(ref AST v) {
   return cast(long)v.data;
+}
+
+AST makeCharAst(char c) {
+  AST v = { data: c, header: ASTTag.Char };
+  return v;
+}
+
+bool astIsChar(ref AST v) { return isAst(v, ASTTag.Char); }
+
+char astToChar(ref AST v) {
+  return cast(char)v.data;
 }
 
 AST makeBoolAst(bool b) {

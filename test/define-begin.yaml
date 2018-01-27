@@ -1,0 +1,14 @@
+cases:
+  - name: define has implicit begin
+    status: 0
+    stdout: "Hey!\n\n"
+
+templates:
+- test.scm: |
+
+    (define (show it)
+      (display it)
+      (newline)
+      (newline))
+
+    (show "Hey!")

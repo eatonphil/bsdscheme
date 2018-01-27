@@ -54,6 +54,9 @@ Tuple!(Token*[], AST) parse(Token*[] tokens) {
       case SchemeType.String:
         atom = makeStringAst(token.value);
         break;
+      case SchemeType.Char:
+        atom = makeCharAst(token.value[0]);
+        break;
       default:
         atom = makeSymbolAst(token.value);
         break;

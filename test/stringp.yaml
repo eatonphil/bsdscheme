@@ -1,0 +1,17 @@
+cases:
+  - name: basic true
+    status: 0
+    stdout: "#t"
+
+    v: "\"Hello world!\""
+
+  - name: basic false
+    status: 0
+    stdout: "#f"
+
+    v: 1
+
+templates:
+- test.scm: |
+
+    (display (string? {{ v }})
