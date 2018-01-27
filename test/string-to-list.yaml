@@ -1,0 +1,9 @@
+cases:
+  - name: basic
+    status: 0
+    stdout: "(#\\H #\\e #\\l #\\l #\\o)"
+
+templates:
+- test.scm: |
+
+    (display (string->list "Hello"))

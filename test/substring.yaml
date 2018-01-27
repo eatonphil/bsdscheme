@@ -1,0 +1,9 @@
+cases:
+  - name: basic
+    status: 0
+    stdout: "Hello"
+
+templates:
+- test.scm: |
+
+    (display (substring "Hello world!" 0 5))

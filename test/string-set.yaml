@@ -1,0 +1,11 @@
+cases:
+  - name: basic
+    status: 0
+    stdout: "Cello world!"
+
+templates:
+- test.scm: |
+
+    (define s "Hello world!")
+    (string-set! s 0 #\C)
+    (display s)

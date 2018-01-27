@@ -1,0 +1,30 @@
+cases:
+  - name: basic true
+    status: 0
+    stdout: "#t"
+
+    t: "\"Hello world!\""
+
+  - name: basic false
+    status: 0
+    stdout: "#f"
+
+    t: "\"Not\""
+
+  - name: basic multiple args true
+    status: 0
+    stdout: "#t"
+
+    t: "s \"Hello world!\""
+
+  - name: basic multiple args false
+    status: 0
+    stdout: "#f"
+
+    t: "s \"Nope\""
+
+templates:
+- test.scm: |
+
+    (define s "Hello world!")
+    (display (string=? s {{ t }})

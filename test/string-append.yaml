@@ -1,0 +1,17 @@
+cases:
+  - name: basic
+    status: 0
+    stdout: "Hey! There!"
+
+    v: "\"Hey!\" \" There!\""
+
+  - name: multiple
+    status: 0
+    stdout: "Hey! There! Fellow!"
+
+    v: "\"Hey!\" \" There!\" \" Fellow!\""
+
+templates:
+- test.scm: |
+
+    (display (string-append {{ v }})

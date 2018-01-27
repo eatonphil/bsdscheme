@@ -1,0 +1,8 @@
+cases:
+  - name: pass list to lambda
+    status: 0
+    stdout: "(1 2 3)"
+
+templates:
+  - test.scm: |
+     (display ((lambda (a) a) '(1 2 3)))

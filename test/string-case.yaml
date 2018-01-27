@@ -1,0 +1,17 @@
+cases:
+  - name: upcase
+    status: 0
+    stdout: "HELLO!"
+
+    fun: string-upcase
+
+  - name: multiple
+    status: 0
+    stdout: "hello!"
+
+    fun: string-downcase
+
+templates:
+- test.scm: |
+
+    (display ({{ fun }} "Hello!")
