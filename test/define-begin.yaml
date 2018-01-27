@@ -7,8 +7,9 @@ templates:
 - test.scm: |
 
     (define (show it)
-      (display it)
-      (newline)
-      (newline))
+      (begin
+        (display it)
+        (newline)
+        (newline)))
 
     (show "Hey!")
