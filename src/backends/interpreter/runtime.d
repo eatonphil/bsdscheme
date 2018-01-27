@@ -189,12 +189,7 @@ Value namedLambda(Value arguments, Context ctx, string name) {
     auto valueTmp = astToList(parameters);
     while (true) {
       auto key = astToSymbol(keyTmp[0]);
-
       auto value = valueTmp[0];
-      // This special case is weird. Not sure if it is correct.
-      if (!astIsList(valueTmp[0])) {
-        value = eval(valueTmp[0], ctx);
-      }
 
       newCtx.set(key, value);
 
