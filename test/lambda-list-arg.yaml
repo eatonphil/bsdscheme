@@ -5,4 +5,4 @@ cases:
 
 templates:
   - test.scm: |
-     (display ((lambda (a) a)) '(1 2 3'))
+     (display ((lambda (a) a) '(1 2 3')))
