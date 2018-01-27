@@ -3,23 +3,23 @@ cases:
     status: 0
     stdout: "TTTTT"
 
-    args: ""
+    argv: ""
 
   - name: with start
     status: 0
     stdout: "HeTTT"
 
-    args: 2
+    argv: 2
 
   - name: with start and end
     status: 0
     stdout: "HeTTo"
 
-    args: 2 4
+    argv: 2 4
 
 templates:
 - test.scm: |
 
     (define s "Hello")
-    (string-fill! s {{ args }})
+    (string-fill! s \#T {{ argv }})
     (display s)
