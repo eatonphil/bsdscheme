@@ -29,4 +29,22 @@
 (define l '(#\a #\b #\c))
 (show (list->string l))
 
-(newline)
+(show (string-upcase s))
+
+(show (string-downcase s))
+
+(show (substring s 0 5))
+
+(show '(1 2 3))
+
+(show (string->list s))
+
+(string-fill! s #\T)
+
+(show s)
+
+(show (string-length s))
+
+(define s "Hello")
+
+(string-fill! s \#T 2 4)

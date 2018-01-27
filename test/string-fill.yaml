@@ -1,0 +1,25 @@
+cases:
+  - name: basic
+    status: 0
+    stdout: "TTTTT"
+
+    args: ""
+
+  - name: with start
+    status: 0
+    stdout: "HeTTT"
+
+    args: 2
+
+  - name: with start and end
+    status: 0
+    stdout: "HeTTo"
+
+    args: 2 4
+
+templates:
+- test.scm: |
+
+    (define s "Hello")
+    (string-fill! s {{ args }})
+    (display s)

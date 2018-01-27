@@ -4,6 +4,7 @@ import std.file : read;
 import std.format;
 import std.functional;
 import std.stdio;
+import std.uni;
 
 import ast;
 import parse;
@@ -188,7 +189,12 @@ Value namedLambda(Value arguments, Context ctx, string name) {
     auto valueTmp = astToList(parameters);
     while (true) {
       auto key = astToSymbol(keyTmp[0]);
-      auto value = eval(valueTmp[0], ctx);
+
+      auto value = valueTmp[0];
+      // This special case is weird. Not sure if it is correct.
+      if (!astIsList(valueTmp[0])) {
+        value = eval(valueTmp[0], ctx);
+      }
 
       newCtx.set(key, value);
 
@@ -506,6 +512,79 @@ Value listToString(Value arguments, Context ctx) {
   return stringFun(car(arguments), ctx);
 }
 
+Value stringUpcase(Value arguments, Context ctx) {
+  auto arg1 = car(arguments);
+  auto s = astToString(arg1);
+  return makeStringAst(toUpper(s));
+}
+
+Value stringDowncase(Value arguments, Context ctx) {
+  auto arg1 = car(arguments);
+  auto s = astToString(arg1);
+  return makeStringAst(toLower(s));
+}
+
+Value stringFill(Value arguments, Context ctx) {
+  auto arg1 = car(arguments);
+  string symbol = astToSymbol(arg1);
+  auto value = eval(arg1, ctx);
+  char[] s = astToString(value).dup;
+
+  auto arg2 = eval(car(cdr(arguments)), ctx);
+  char c = astToChar(arg2);
+
+  long start = 0, end = s.length;
+
+  auto cddr = cdr(cdr(arguments));
+  if (!astIsNil(cddr)) {
+    auto arg3 = eval(car(cddr), ctx);
+    start = astToInteger(arg3);
+
+    auto cdddr = cdr(cddr);
+    if (!astIsNil(cdddr)) {
+      auto arg4 = eval(car(cdddr), ctx);
+      end = astToInteger(arg4);
+    }
+  }
+
+  for (long i = start; i < end; i++) {
+    s[i] = c;
+  }
+
+  value = makeStringAst(s.dup);
+  ctx.set(symbol, value);
+
+  return value;
+}
+
+Value substring(Value arguments, Context ctx) {
+  auto arg1 = car(arguments);
+  char[] s = astToString(arg1).dup;
+
+  auto arg2 = car(cdr(arguments));
+  long start = astToInteger(arg2);
+
+  auto arg3 = car(cdr(cdr(arguments)));
+  long end = astToInteger(arg3);
+
+  return makeStringAst(s[start .. end].dup);
+}
+
+Value stringToList(Value arguments, Context ctx) {
+  auto arg1 = car(arguments);
+  char[] s = astToString(arg1).dup;
+
+  auto value = nilValue;
+
+  foreach (char c; s) {
+    auto cValue = makeCharAst(c);
+    auto part = makeListAst(cValue, nilValue);
+    value = appendList(value, part);
+  }
+
+  return makeListAst(value, nilValue);
+}
+
 class Context {
   Value[string] map;
   Value function(Value, Context)[string] builtins;
@@ -533,15 +612,13 @@ class Context {
       "string=?": &stringEquals,
       "string-append": &stringAppend,
       "list->string": &listToString,
+      "string-upcase": &stringUpcase,
+      "string-downcase": &stringDowncase,
+      "substring": &substring,
+      "string->list": &stringToList,
       //"string-ci=?" &stringCIEquals,
-      //"string-upcase": &stringUpcase,
-      //"string-downcase": &stringDowncase,
       //"string-foldcase": &stringFoldcase,
-      //"substring": &substring,
-      //"string->list": &stringToList,
       //"string-copy": &stringCopy,
-      //"string-copy!" &stringCopyMut,
-      //"string-fill!": &stringFill,
     ];
 
     this.builtinSpecials = [
@@ -553,6 +630,8 @@ class Context {
       "eval": &_eval,
       "quote": &quote,
       "string-set!": &stringSet,
+      "string-fill!": &stringFill,
+      //"string-copy!" &stringCopyMut,
     ];
   }
 

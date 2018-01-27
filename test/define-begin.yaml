@@ -1,15 +1,13 @@
 cases:
   - name: define has implicit begin
     status: 0
-    stdout: "Hey!\n\n"
+    stdout: "Hey!Hey!"
 
 templates:
 - test.scm: |
 
     (define (show it)
-      (begin
-        (display it)
-        (newline)
-        (newline)))
+      (display it)
+      (display it))
 
     (show "Hey!")
