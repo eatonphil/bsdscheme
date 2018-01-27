@@ -7,5 +7,5 @@ templates:
 - test.scm: |
 
     (define s "Hello world!")
-    (string-set s 0 #\C)
+    (string-set! s 0 #\C)
     (display s)

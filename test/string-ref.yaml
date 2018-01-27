@@ -1,7 +1,7 @@
 cases:
   - name: basic
     status: 0
-    stdout: "#\e"
+    stdout: "#\\e"
 
 templates:
 - test.scm: |
