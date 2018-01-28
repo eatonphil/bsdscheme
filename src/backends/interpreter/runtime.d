@@ -630,7 +630,7 @@ Value vectorFill(Value arguments, Context ctx) {
   auto arg1 = car(arguments);
   string symbol = astToSymbol(arg1);
   auto value = eval(arg1, ctx);
-  auto vector = astToVector(vector);
+  auto vector = astToVector(value);
 
   auto arg2 = eval(car(cdr(arguments)), ctx);
 
@@ -643,12 +643,12 @@ Value vectorFill(Value arguments, Context ctx) {
 
     auto cdddr = cdr(cddr);
     if (!astIsNil(cdddr)) {
-      auto arg4 = eval(car(cdddr), ctx)
+      auto arg4 = eval(car(cdddr), ctx);
       end = astToInteger(arg4);
     }
   }
 
-  for (int i = start; i < end; i++) {
+  for (long i = start; i < end; i++) {
     updateAstVector(vector, i, arg2);
   }
 
