@@ -653,6 +653,76 @@ Value vectorFill(Value arguments, Context ctx) {
   return value;
 }
 
+Value vectorToString(AST arguments, Context ctx) {
+  auto arg1 = car(arguments);
+  auto vector = astToVector(arg1);
+
+  string s = "";
+
+  foreach (c; vector) {
+    s ~= astToChar(c);
+  }
+
+  return makeStringAst(s);
+}
+
+Value stringToVector(AST arguments, Context ctx) {
+  auto arg1 = car(arguments);
+  auto s = astToString(arg1);
+
+  AST[] v;
+
+  foreach (c; s) {
+    v ~= makeCharAst(c);
+  }
+
+  return makeVectorAst(v);
+}
+
+Value _vectorToList(AST arguments, Context ctx) {
+  auto arg1 = car(arguments);
+  return vectorToList(astToVector(arg1));
+}
+
+Value _listToVector(AST arguments, Context ctx) {
+  return makeVectorAst(listToVector(car(arguments)));
+}
+
+Value vectorAppend(AST arguments, Context ctx) {
+  AST[] vector;
+
+  auto iterator = arguments;
+  while (!astIsNil(iterator)) {
+    auto arg = car(iterator);
+    auto vArg = astToVector(arg);
+    vector ~= vArg;
+    iterator = cdr(iterator);
+  }
+
+  return makeVectorAst(vector);
+}
+
+Value makeVector(AST arguments, Context ctx) {
+  auto arg1 = car(arguments);
+  auto k = astToInteger(arg1);
+
+  char c = '\0';
+  auto rest = cdr(arguments);
+  if (!astIsNil(rest)) {
+    auto arg2 = car(rest);
+    c = astToChar(arg2);
+  }
+
+  AST[] v;
+  v.length = k;
+
+  foreach (i, _; v) {
+    v[i] = makeCharAst(c);
+  }
+
+  return makeVectorAst(v);
+}
+
 class Context {
   Value[string] map;
   Value function(Value, Context)[string] builtins;
@@ -687,6 +757,12 @@ class Context {
       "vector-length": &vectorLength,
       "vector-ref": &vectorRef,
       "vector?": &vectorP,
+      "vector->string": &vectorToString,
+      "string->vector": &stringToVector,
+      "vector->list": &_vectorToList,
+      "list->vector": &_listToVector,
+      "vector-append": &vectorAppend,
+      "make-vector": &makeVector,
     ];
 
     this.builtinSpecials = [

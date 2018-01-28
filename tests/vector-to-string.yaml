@@ -1,0 +1,15 @@
+cases:
+  - name: simple 
+    status: 0
+    stdout: "foobar|foobar1|foobar2|foobar3"
+
+templates:
+  - test.scm: |
+
+      (display (vector->string (string->vector "foobar")))
+      (display "|")
+      (display (vector->string (list->vector (vector->list (string->vector "foobar1")))))
+      (display "|")
+      (display (vector->string (list->vector (vector->list (string->vector "foobar2")))))
+      (display "|")
+      (display (vector->string (vector-append (string->vector "foo") (string->vector "bar3"))))
