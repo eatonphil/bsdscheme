@@ -61,7 +61,7 @@ BSDScheme v0.0.0
 ## Current state
 
 * Supported:
-  * Literals: strings, characters, boolean, vectors, lists
+  * Literals: strings, characters, boolean, vectors, lists, pairs
   * Read / eval / include
   * Comments
   * Command-line REPL
