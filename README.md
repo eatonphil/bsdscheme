@@ -46,12 +46,25 @@ $ ./bin/bsdi examples/read-eval.scm
 3
 ```
 
+### REPL
+
+```
+$ ./bin/bsdi
+BSDScheme v0.0.0
+> (define (show it) (display it) (newline))
+> (show '(1 2 3))
+(1 2 3)
+> (show (vector-ref #(1 2 3) 1))
+2
+```
+
 ## Current state
 
 * Supported:
   * Literals: strings, characters, boolean, vectors, lists
   * Read / eval / include
   * Comments
+  * Command-line REPL
 * Missing (but planned, R7RS is the obvious goal):
   * Tail-call optimization
   * Macros
