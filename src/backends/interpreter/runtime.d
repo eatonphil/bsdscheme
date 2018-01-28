@@ -542,10 +542,9 @@ Value stringFill(Value arguments, Context ctx) {
   }
 
   for (long i = start; i < end; i++) {
-    s[i] = c;
+    updateAstString(value, i, c);
   }
 
-  value = makeStringAst(s.dup);
   ctx.set(symbol, value);
 
   return value;
@@ -576,7 +575,7 @@ Value stringToList(Value arguments, Context ctx) {
     value = appendList(value, part);
   }
 
-  return makeListAst(value, nilValue);
+  return value;
 }
 
 Value vectorFun(Value arguments, Context ctx) {
@@ -622,7 +621,7 @@ Value vectorSet(Value arguments, Context ctx) {
 
   auto arg3 = eval(car(cdr(cdr(arguments))), ctx);
 
-  updateAstVector(astToVector(value), index, arg3);
+  updateAstVector(value, index, arg3);
   return value;
 }
 
@@ -649,7 +648,7 @@ Value vectorFill(Value arguments, Context ctx) {
   }
 
   for (long i = start; i < end; i++) {
-    updateAstVector(vector, i, arg2);
+    updateAstVector(value, i, arg2);
   }
 
   return value;
