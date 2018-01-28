@@ -1,0 +1,9 @@
+cases:
+  - name: simple 
+    status: 0
+    stdout: "foobar"
+
+templates:
+  - test.scm: |
+
+      (display (vector-append (string->vector "foo") (string->vector "bar")))

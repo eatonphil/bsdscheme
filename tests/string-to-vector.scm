@@ -1,0 +1,1 @@
+(string->vector "foobar")

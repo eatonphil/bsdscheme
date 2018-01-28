@@ -1,4 +1,5 @@
 import std.stdio;
+import std.string;
 
 import parse;
 import ast;
@@ -16,8 +17,13 @@ void repl() {
   auto ctx = new Context;
   write("> ");
   while ((line = readln()) !is null) {
-    AST ast = car(read(line.dup));
-    eval(ast, ctx);
+    line = line.strip();
+
+    if (line.length) {
+      AST ast = car(read(line.dup));
+      eval(ast, ctx);
+    }
+
     write("> ");
   }
 }

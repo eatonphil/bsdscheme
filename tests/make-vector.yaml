@@ -1,0 +1,13 @@
+cases:
+  - name: simple 
+    status: 0
+    stdout: "#(cats cats cats)#(cats dog cats)"
+
+templates:
+  - test.scm: |
+
+      (define t (make-vector 3))
+      (vector-fill! t "cats")
+      (display t)
+      (vector-set! t 1 "dog")
+      (display t)
