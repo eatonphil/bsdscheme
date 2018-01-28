@@ -1,0 +1,24 @@
+cases:
+  - name: basic
+    status: 0
+    stdout: (1 . 2)
+
+    pair: "'(1 . 2)"
+
+  - name: second arg is list
+    status: 0
+    stdout: 3
+
+    pair: (+ 1 . (2))
+
+  - name: first and second args are list
+    status: 0
+    stdout: ((a b c) d e f)
+
+    pair: "'((a b c) . (d e f))"
+
+templates:
+  - test.scm: |
+
+      (define a {{ pair }})
+      (display a)

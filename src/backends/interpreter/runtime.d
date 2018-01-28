@@ -185,21 +185,28 @@ Value namedLambda(Value arguments, Context ctx, string name) {
   Value defined(Value parameters, Context ctx) {
     Context newCtx = ctx.dup();
 
-    auto keyTmp = astToList(funArguments);
-    auto valueTmp = astToList(parameters);
-    while (true) {
-      auto key = astToSymbol(keyTmp[0]);
-      auto value = valueTmp[0];
+    if (astIsList(funArguments)) {
+      auto keyTmp = astToList(funArguments);
+      auto valueTmp = astToList(parameters);
+      while (true) {
+        auto key = astToSymbol(keyTmp[0]);
+        auto value = valueTmp[0];
 
-      newCtx.set(key, value);
+        newCtx.set(key, value);
 
-      // TODO: handle arg count mismatch
-      if (astIsList(keyTmp[1])) {
-        keyTmp = astToList(keyTmp[1]);
-        valueTmp = astToList(valueTmp[1]);
-      } else {
-        break;
+        // TODO: handle arg count mismatch
+        if (astIsList(keyTmp[1])) {
+          keyTmp = astToList(keyTmp[1]);
+          valueTmp = astToList(valueTmp[1]);
+        } else {
+          break;
+        }
       }
+    } else if (astIsSymbol(funArguments)) {
+      auto key = astToSymbol(funArguments);
+      newCtx.set(key, car(parameters));
+    } else {
+      error("Expected symbol or list in lambda formals", funArguments);
     }
 
     auto begin = makeSymbolAst("begin");

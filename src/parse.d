@@ -28,6 +28,22 @@ Tuple!(Token*[], AST) parse(Token*[] tokens) {
     case TokenType.RightParen:
       return Tuple!(Token*[], AST)(tokens[i + 1 .. tokens.length], list);
       break;
+    case TokenType.Dot:
+      auto nextToken = tokens[i + 1];
+      bool cdrIsList = nextToken.type == TokenType.LeftParen;
+
+      auto program = parse(tokens[i + 1 .. tokens.length]);
+      auto pTuple = astToList(program[1]);
+      auto tuple = astToList(list);
+
+      if (cdrIsList) {
+        list = appendList(list, pTuple[0]);
+      } else {
+        list = makeListAst(tuple[0], pTuple[0]);
+      }
+
+      return Tuple!(Token*[], AST)(program[0], list);
+      break;
     case TokenType.Special:
       AST symbol = makeSymbolAst(token.value);
 
@@ -66,6 +82,8 @@ Tuple!(Token*[], AST) parse(Token*[] tokens) {
 
     i += 1;
   }
+
+ ret:
 
   if (i > 0) {
     return Tuple!(Token*[], AST)(tokens[i + 1 .. tokens.length], list);

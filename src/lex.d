@@ -7,6 +7,7 @@ enum TokenType {
   RightParen,
   Special,
   Atom,
+  Dot,
 }
 
 enum SchemeType {
@@ -154,6 +155,7 @@ Token* lexSymbol(StringBuffer input, int line, ref int column) {
     switch (c) {
     case '(':
     case ')':
+    case '.':
     case '#':
     case '\'':
     case ' ':
@@ -228,6 +230,14 @@ Token* lexVector(StringBuffer input, int line, int column) {
   return null;
 }
 
+Token* lexDot(StringBuffer input, int line, int column) {
+  if (input.current() == '.') {
+    return new Token(line, column, "", ".", TokenType.Dot, SchemeType.Symbol);
+  }
+
+  return null;
+}
+
 Token* lexComment(StringBuffer input, int line, ref int column) {
   if (input.current() == ';') {
     do {
@@ -286,6 +296,10 @@ TokenBuffer lex(StringBuffer input) {
 
     if (token is null) {
       token = lexVector(input, line, column);
+    }
+
+    if (token is null) {
+      token = lexDot(input, line, column);
     }
 
     if (token !is null) {
