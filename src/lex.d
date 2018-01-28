@@ -274,6 +274,8 @@ TokenBuffer lex(StringBuffer input) {
 
     if (token !is null) {
       tokens.push(token);
+    } else {
+      throw new Exception(format("[LEX]: Unexpected token: %c", input.current()));
     }
   } while (input.next());
 
