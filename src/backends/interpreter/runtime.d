@@ -478,14 +478,14 @@ Value stringSet(Value arguments, Context ctx) {
   auto arg1 = car(arguments);
   auto symbol = astToSymbol(arg1);
   auto value = eval(arg1, ctx);
-  char[] s = astToString(value).dup;
+
   auto arg2 = eval(car(cdr(arguments)), ctx);
   long k = astToInteger(arg2);
+
   auto arg3 = eval(car(cdr(cdr(arguments))), ctx);
   char c = astToChar(arg3);
-  s[k] = c;
-  value = makeStringAst(s.dup);
-  ctx.set(symbol, value);
+
+  updateAstString(value, k, c);
   return value;
 }
 
@@ -542,10 +542,9 @@ Value stringFill(Value arguments, Context ctx) {
   }
 
   for (long i = start; i < end; i++) {
-    s[i] = c;
+    updateAstString(value, i, c);
   }
 
-  value = makeStringAst(s.dup);
   ctx.set(symbol, value);
 
   return value;
@@ -576,7 +575,7 @@ Value stringToList(Value arguments, Context ctx) {
     value = appendList(value, part);
   }
 
-  return makeListAst(value, nilValue);
+  return value;
 }
 
 Value vectorFun(Value arguments, Context ctx) {
@@ -622,7 +621,7 @@ Value vectorSet(Value arguments, Context ctx) {
 
   auto arg3 = eval(car(cdr(cdr(arguments))), ctx);
 
-  updateAstVector(astToVector(value), index, arg3);
+  updateAstVector(value, index, arg3);
   return value;
 }
 
@@ -630,7 +629,7 @@ Value vectorFill(Value arguments, Context ctx) {
   auto arg1 = car(arguments);
   string symbol = astToSymbol(arg1);
   auto value = eval(arg1, ctx);
-  auto vector = astToVector(vector);
+  auto vector = astToVector(value);
 
   auto arg2 = eval(car(cdr(arguments)), ctx);
 
@@ -643,13 +642,13 @@ Value vectorFill(Value arguments, Context ctx) {
 
     auto cdddr = cdr(cddr);
     if (!astIsNil(cdddr)) {
-      auto arg4 = eval(car(cdddr), ctx)
+      auto arg4 = eval(car(cdddr), ctx);
       end = astToInteger(arg4);
     }
   }
 
-  for (int i = start; i < end; i++) {
-    updateAstVector(vector, i, arg2);
+  for (long i = start; i < end; i++) {
+    updateAstVector(value, i, arg2);
   }
 
   return value;

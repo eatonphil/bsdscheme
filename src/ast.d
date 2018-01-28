@@ -152,8 +152,17 @@ AST makeStringAst(string s) {
 
 bool astIsString(ref AST v) { return isAst(v, ASTTag.String); }
 
+char* astToByteVector(ref AST v) {
+  return cast(char*)v.data;
+}
+
 string astToString(ref AST v) {
-  return fromStringz(cast(char*)v.data).dup;
+  return fromStringz(astToByteVector(v)).dup;
+}
+
+void updateAstString(AST v, long index, char c) {
+  auto vector = astToByteVector(v);
+  vector[index] = c;
 }
 
 AST makeSymbolAst(string s) {
@@ -210,6 +219,7 @@ AST[] astToVector(ref AST v) {
   return vector;
 }
 
-void updateAstVector(AST[] v, long index, AST element) {
-  v[index] = element;
+void updateAstVector(AST v, long index, AST element) {
+  auto vector = astToVector(v);
+  vector[index] = element;
 }

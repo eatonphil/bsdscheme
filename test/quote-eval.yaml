@@ -1,0 +1,10 @@
+cases:
+  - name: eval a quoted form
+    status: 0
+    stdout: 3
+
+templates:
+- test.scm: |
+
+    (define x '(+ 1 2))
+    (display (eval x))
