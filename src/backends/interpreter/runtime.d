@@ -689,13 +689,6 @@ class Context {
       "vector-length": &vectorLength,
       "vector-ref": &vectorRef,
       "vector?": &vectorP,
-      //"make-vector": &makeVector,
-      // "vector->list": &vectorToList,
-      // "list->vector": &listToVector,
-      // "vector->string": &vectorToString,
-      // "string->vector": &stringToVector,
-      // "vector-copy": &vectorCopy,
-      // "vector-append": &vectorAppend,
     ];
 
     this.builtinSpecials = [

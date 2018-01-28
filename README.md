@@ -46,15 +46,20 @@ $ ./bin/bsdi examples/read-eval.scm
 3
 ```
 
-## Features
+## Current state
 
-This isn't so much "features" as in its done unique or well so much
-as any of it can be done at all.
-
-* Big numbers
-* Strings
-* Read / eval
-* Line comments
+* Supported:
+  * Literals: strings, characters, boolean, vectors, lists
+  * Read / eval / include
+  * Comments
+* Missing (but planned, R7RS is the obvious goal):
+  * Tail-call optimization
+  * Macros
+  * Dotted pair syntax
+  * Labelled let
+  * Modules
+  * D FFI
+  * Threading support
 
 ## Testing
 
