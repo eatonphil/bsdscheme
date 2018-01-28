@@ -81,65 +81,72 @@ class Buffer(T) {
 
 alias Buffer!(char) StringBuffer;
 
-Token* lexLeftParen(StringBuffer input) {
+Token* lexLeftParen(StringBuffer input, int line, int column) {
   char c = input.current();
   if (c == '(' || c == '[') {
-    return new Token(0, 0, "", to!string(c), TokenType.LeftParen);
+    return new Token(line, column, "", to!string(c), TokenType.LeftParen);
   }
 
   return null;
 }
 
-Token* lexRightParen(StringBuffer input) {
+Token* lexRightParen(StringBuffer input, int line, int column) {
   char c = input.current();
   if (c == ')' || c == ']') {
-    return new Token(0, 0, "", to!string(c), TokenType.RightParen);
+    return new Token(line, column, "", to!string(c), TokenType.RightParen);
   }
 
   return null;
 }
 
-Token* lexQuote(StringBuffer input) {
+Token* lexQuote(StringBuffer input, int line, int column) {
   if (input.current() == '\'') {
-    return new Token(0, 0, "", "quote", TokenType.Special, SchemeType.Symbol);
+    return new Token(line, column, "", "quote", TokenType.Special, SchemeType.Symbol);
   }
 
   return null;
 }
 
-Token* lexBool(StringBuffer input) {
+Token* lexBool(StringBuffer input, int line, ref int column) {
   if (input.current() == '#') {
     input.next();
 
+    column++;
     if (input.current() == 't' || input.current() == 'f') {
-      return new Token(0, 0, "", "#", TokenType.Atom, SchemeType.Bool);
+      column++;
+      input.next();
+      return new Token(line, column, "", "#", TokenType.Atom, SchemeType.Bool);
     }
 
+    column--;
     input.previous();
   }
 
   return null;
 }
 
-Token* lexChar(StringBuffer input) {
+Token* lexChar(StringBuffer input, int line, ref int column) {
   if (input.current() == '#') {
     input.next();
+    column++;
 
     if (input.current() == '\\') {
+      column++;
       input.next();
 
       char[1] s = [input.current()];
-      return new Token(0, 0, "", s.dup, TokenType.Atom, SchemeType.Char);
+      return new Token(line, column, "", s.dup, TokenType.Atom, SchemeType.Char);
     }
 
+    column--;
     input.previous();
   }
 
   return null;
 }
 
-Token* lexSymbol(StringBuffer input) {
-  string symbol = "";
+Token* lexSymbol(StringBuffer input, int line, ref int column) {
+  char[] symbol;
 
  loop: do {
     auto c = input.current();
@@ -158,11 +165,13 @@ Token* lexSymbol(StringBuffer input) {
       break loop;
       break;
     default:
-      symbol ~= to!string(c);
+      column++;
+      symbol ~= c;
     }
   } while (input.next());
 
   if (symbol.length) {
+    column--;
     input.previous();
 
     auto schemeType = SchemeType.Symbol;
@@ -170,19 +179,20 @@ Token* lexSymbol(StringBuffer input) {
       schemeType = SchemeType.Integer;
     }
 
-    return new Token(0, 0, "", symbol, TokenType.Atom, schemeType);
+    return new Token(line, column, "", symbol.dup, TokenType.Atom, schemeType);
   }
 
   return null;
 }
 
-Token* lexString(StringBuffer input) {
-  string s = "";
+Token* lexString(StringBuffer input, int line, ref int column) {
+  char[] s;
 
   if (input.current() != '"') {
     return null;
   }
 
+  column++;
   input.next();
 
   do {
@@ -192,34 +202,36 @@ Token* lexString(StringBuffer input) {
       break;
     }
 
-    s ~= to!string(c);
+    column++;
+    s ~= c;
   } while (input.next());
 
   if (s.length) {
     auto schemeType = SchemeType.String;
-    return new Token(0, 0, "", s, TokenType.Atom, schemeType);
+    return new Token(line, column, "", s.dup, TokenType.Atom, schemeType);
   }
 
   return null;
 }
 
-Token* lexVector(StringBuffer input) {
+Token* lexVector(StringBuffer input, int line, int column) {
   if (input.current() == '#') {
     input.next();
     char c = input.current();
     input.previous();
 
     if (c == '(') {
-      return new Token(0, 0, "", "vector", TokenType.Special, SchemeType.Symbol);
+      return new Token(line, column, "", "vector", TokenType.Special, SchemeType.Symbol);
     }
   }
 
   return null;
 }
 
-Token* lexComment(StringBuffer input) {
+Token* lexComment(StringBuffer input, int line, ref int column) {
   if (input.current() == ';') {
     do {
+      column++;
       if (input.current() == '\n') {
         break;
       }
@@ -234,48 +246,64 @@ alias Buffer!(Token*) TokenBuffer;
 TokenBuffer lex(StringBuffer input) {
   auto tokens = new TokenBuffer();
 
+  int line = 1;
+  int column = 0;
   do {
-    auto token = lexLeftParen(input);
+    column++;
+
+    auto token = lexLeftParen(input, line, column);
     if (token is null) {
-      token = lexRightParen(input);
+      token = lexRightParen(input, line, column);
     }
 
     if (token is null) {
-      token = lexRightParen(input);
+      token = lexRightParen(input, line, column);
     }
 
     if (token is null) {
-      token = lexQuote(input);
+      token = lexQuote(input, line, column);
     }
 
     if (token is null) {
-      token = lexSymbol(input);
+      token = lexSymbol(input, line, column);
     }
 
     if (token is null) {
-      token = lexChar(input);
+      token = lexChar(input, line, column);
     }
 
     if (token is null) {
-      token = lexBool(input);
+      token = lexBool(input, line, column);
     }
 
     if (token is null) {
-      token = lexString(input);
+      token = lexString(input, line, column);
     }
 
     if (token is null) {
-      token = lexComment(input);
+      token = lexComment(input, line, column);
     }
 
     if (token is null) {
-      token = lexVector(input);
+      token = lexVector(input, line, column);
     }
 
     if (token !is null) {
       tokens.push(token);
     } else {
-      throw new Exception(format("[LEX]: Unexpected token: %c", input.current()));
+      char c = input.current();
+
+      if (c == '\n') {
+        line++;
+        column = -1;
+        continue;
+      }
+
+      if (c == ' ' || c == '\t') {
+        continue;
+      }
+
+      throw new Exception(format("[LEX]: Unexpected token at (%d, %d): %c", line, column, input.current()));
     }
   } while (input.next());
 
