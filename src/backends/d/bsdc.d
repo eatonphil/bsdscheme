@@ -2,6 +2,7 @@ import std.array;
 import std.file;
 import std.format;
 import std.functional;
+import std.process;
 import std.stdio;
 
 import ast;
@@ -146,6 +147,20 @@ void generate(Program pgm, string outFile) {
   }
 }
 
+void build(string buildFile, string[] localDImports, string outFile) {
+  string[] importsWithPath;
+
+  foreach (imp; localDImports) {
+    importsWithPath ~= format("src/%s", imp);
+  }
+
+  string[] cmd = ["ldc", buildFile] ~ importsWithPath ~ ["-of", outFile];
+  auto execution = execute(cmd);
+  if (execution.status != 0) {
+    writeln(execution.output);
+  }
+}
+
 int main(string[] args) {
   auto source = cast(char[])read(args[1]);
   AST ast = parse.read(source);
@@ -154,12 +169,19 @@ int main(string[] args) {
   Program pgm;
   compile(withBegin(ast), &ctx, &pgm);
 
-  foreach (imp; ["std.stdio", "ast", "utility"]) {
+  string[] dImports = ["std.stdio"];
+  string[] localDImports = ["ast", "utility"];
+
+  foreach (imp; dImports ~ localDImports) {
     pgm.external ~= format("import %s;", imp);
   }
   pgm.definitions ~= "void main() { BSDScheme_main(); }";
 
-  generate(pgm, "a.d");
+  auto buildFile = args.length > 2 ? args[2] : "a.d";
+  generate(pgm, buildFile);
+
+  auto outFile = args.length > 3 ? args[3] : "a";
+  build(buildFile, localDImports, outFile);
 
   return 0;
 }
