@@ -1,7 +1,7 @@
 cases:
   - name: simple 
     status: 0
-    stdout: "(#\\f #\\o #\\o #\\b #\\a #\\r)"
+    stdout: "#(#\\f #\\o #\\o #\\b #\\a #\\r)"
 
 templates:
   - test.scm: |
