@@ -74,7 +74,7 @@ AST compileBegin(AST ast, Context* ctx, Program* pgm) {
 
 AST compileDisplay(AST ast, Context* ctx, Program* pgm) {
   auto compiled = compile(car(ast), ctx, pgm);
-  return makeStringAst(format("writeln(formatAst(%s)), nil", astToString(compiled)));
+  return makeStringAst(format("{writeln(formatAst(%s)); return nil;}()", astToString(compiled)));
 }
 
 AST compile(AST ast, Context* ctx, Program* pgm) {
@@ -134,13 +134,9 @@ void generate(Program pgm, string outFile) {
     f.writeln(line);
   }
 
-  f.writeln();
-
   foreach (line; pgm.constants) {
     f.writeln(line);
   }
-
-  f.writeln();
 
   foreach (line; pgm.definitions) {
     f.writeln(line);
