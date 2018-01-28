@@ -8,7 +8,7 @@ templates:
 
       (display (vector->string (string->vector "foobar")))
       (display "|")
-      (display (vector->string (vector->list (list->vector (vector->list (string->vector "foobar1"))))))
+      (display (vector->string (list->vector (vector->list (string->vector "foobar1")))))
       (display "|")
       (display (vector->string (list->vector (vector->list (string->vector "foobar2")))))
       (display "|")
