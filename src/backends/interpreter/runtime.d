@@ -478,14 +478,14 @@ Value stringSet(Value arguments, Context ctx) {
   auto arg1 = car(arguments);
   auto symbol = astToSymbol(arg1);
   auto value = eval(arg1, ctx);
-  char[] s = astToString(value).dup;
+
   auto arg2 = eval(car(cdr(arguments)), ctx);
   long k = astToInteger(arg2);
+
   auto arg3 = eval(car(cdr(cdr(arguments))), ctx);
   char c = astToChar(arg3);
-  s[k] = c;
-  value = makeStringAst(s.dup);
-  ctx.set(symbol, value);
+
+  updateAstString(value, k, c);
   return value;
 }
 
