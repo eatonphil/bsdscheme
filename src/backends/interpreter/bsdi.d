@@ -2,6 +2,7 @@ import std.stdio;
 
 import parse;
 import ast;
+import utility;
 
 import runtime;
 import value;

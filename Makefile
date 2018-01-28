@@ -5,7 +5,7 @@ all: bin/bsdi bin/bsdc
 bin/bsdi: src/backends/interpreter/*.d src/*.d
 	ldc -of $@ $^
 
-bin/bsdc: src/backends/llvm/*.d src/*.d
+bin/bsdc: src/backends/d/*.d src/*.d
 	ldc -of $@ $^
 
 install:

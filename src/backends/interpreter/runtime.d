@@ -321,16 +321,8 @@ Value cons(Value arguments, Context ctx) {
   return arguments;
 }
 
-Value car(Value arguments) {
-  return astToList(arguments)[0];
-}
-
 Value _car(Value arguments, Context ctx) {
   return car(car(arguments));
-}
-
-Value cdr(Value arguments) {
-  return astToList(arguments)[1];
 }
 
 Value _cdr(Value arguments, Context ctx) {

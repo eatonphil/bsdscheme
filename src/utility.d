@@ -22,3 +22,28 @@ AST reverseList(AST value) {
 
   return value;
 }
+
+AST car(AST arguments) {
+  return astToList(arguments)[0];
+}
+
+AST cdr(AST arguments) {
+  return astToList(arguments)[1];
+}
+
+AST[] listToVector(AST list) {
+  AST[] vector;
+  while (!astIsNil(list)) {
+    vector ~= car(list);
+    list = cdr(list);
+  }
+  return vector;
+}
+
+AST vectorToList(AST[] vector) {
+  AST list;
+  foreach (i; vector) {
+    list = appendList(list, makeListAst(i, nil));
+  }
+  return list;
+}

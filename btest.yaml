@@ -1,4 +1,4 @@
-test_path: test
+test_path: tests
 
 runners:
   - name: bsdi

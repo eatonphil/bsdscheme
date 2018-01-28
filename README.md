@@ -58,6 +58,20 @@ BSDScheme v0.0.0
 2
 ```
 
+### Compiler
+
+```
+$ cat examples/compile-basic.scm
+(define (plus a b)
+  (+ a b))
+
+(define (main)
+  (display (plus 1 2)))
+$ ./bin/bsdc examples/compile-basic.scm
+$ ./a
+3
+```
+
 ## Current state
 
 * Supported:
