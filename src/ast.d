@@ -62,8 +62,17 @@ string formatAst(AST v) {
 
     return format("%s)", fmt);
     break;
+  case ASTTag.Vector:
+    auto vector = astToVector(v);
+    auto fmt = format("#(%s", formatAst(vector[0]));
+
+    foreach (AST i; vector[1 .. vector.length]) {
+      fmt = format("%s %s", fmt, formatAst(i));
+    }
+
+    return format("%s)", fmt);
+    break;
   default:
-    // TODO: support vector
     return "<unknown object>";
   }
 }
@@ -183,12 +192,24 @@ Tuple!(AST, AST) astToList(AST v) {
 
 AST makeVectorAst(AST[] v) {
   ulong size = v.length > MAX_VALUE_LENGTH ? MAX_VALUE_LENGTH : v.length;
-  AST ve = { data: cast(long)v.ptr, header: size << HEADER_TAG_WIDTH | ASTTag.Vector };
+  AST[] vCopy = new AST[v.length];
+  foreach (i, e; v) {
+    vCopy[i] = e;
+  }
+
+  AST ve = { data: cast(long)vCopy.ptr, header: size << HEADER_TAG_WIDTH | ASTTag.Vector };
   return ve;
 }
 
 bool astIsVector(ref AST v) { return isAst(v, ASTTag.Vector); }
 
 AST[] astToVector(ref AST v) {
-  return *cast(AST[]*)v.data;
+  long size = v.header >> HEADER_TAG_WIDTH;
+  AST[] vector;
+  vector = (cast(AST*)v.data)[0 .. size];
+  return vector;
+}
+
+void updateAstVector(AST[] v, long index, AST element) {
+  v[index] = element;
 }

@@ -5,7 +5,7 @@ import std.stdio;
 enum TokenType {
   LeftParen,
   RightParen,
-  Quote,
+  Special,
   Atom,
 }
 
@@ -101,7 +101,7 @@ Token* lexRightParen(StringBuffer input) {
 
 Token* lexQuote(StringBuffer input) {
   if (input.current() == '\'') {
-    return new Token(0, 0, "", "\'", TokenType.Quote, SchemeType.Symbol);
+    return new Token(0, 0, "", "quote", TokenType.Special, SchemeType.Symbol);
   }
 
   return null;
@@ -115,7 +115,6 @@ Token* lexBool(StringBuffer input) {
       return new Token(0, 0, "", "#", TokenType.Atom, SchemeType.Bool);
     }
 
-    input.previous();
     input.previous();
   }
 
@@ -204,6 +203,20 @@ Token* lexString(StringBuffer input) {
   return null;
 }
 
+Token* lexVector(StringBuffer input) {
+  if (input.current() == '#') {
+    input.next();
+    char c = input.current();
+    input.previous();
+
+    if (c == '(') {
+      return new Token(0, 0, "", "vector", TokenType.Special, SchemeType.Symbol);
+    }
+  }
+
+  return null;
+}
+
 Token* lexComment(StringBuffer input) {
   if (input.current() == ';') {
     do {
@@ -253,6 +266,10 @@ TokenBuffer lex(StringBuffer input) {
 
     if (token is null) {
       token = lexComment(input);
+    }
+
+    if (token is null) {
+      token = lexVector(input);
     }
 
     if (token !is null) {

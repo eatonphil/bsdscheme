@@ -48,3 +48,5 @@
 (define s "Hello")
 
 (string-fill! s \#T 2 4)
+
+(show s)

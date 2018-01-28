@@ -28,12 +28,12 @@ Tuple!(Token*[], AST) parse(Token*[] tokens) {
     case TokenType.RightParen:
       return Tuple!(Token*[], AST)(tokens[i + 1 .. tokens.length], list);
       break;
-    case TokenType.Quote:
-      AST quote = makeSymbolAst("quote");
+    case TokenType.Special:
+      AST symbol = makeSymbolAst(token.value);
 
       auto program = parse(tokens[i + 1 .. tokens.length]);
-      auto quoted = makeListAst(quote, program[1]);
-      list = appendList(list, makeListAst(quoted, nil));
+      auto special = makeListAst(symbol, program[1]);
+      list = appendList(list, makeListAst(special, nil));
 
       tokens = [new Token(0, 0, "", ")", TokenType.RightParen)];
       foreach (nextToken; program[0]) {

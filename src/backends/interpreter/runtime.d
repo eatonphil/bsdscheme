@@ -331,7 +331,6 @@ Value _cdr(Value arguments, Context ctx) {
 }
 
 Value begin(Value arguments, Context ctx) {
-  // TODO: rewrite using reduce.
   Value result = arguments;
   auto tmp = astToList(arguments);
 
@@ -580,6 +579,82 @@ Value stringToList(Value arguments, Context ctx) {
   return makeListAst(value, nilValue);
 }
 
+Value vectorFun(Value arguments, Context ctx) {
+  Value[] vector;
+  auto iterator = car(arguments);
+  while (!astIsNil(iterator)) {
+    vector ~= eval(car(iterator), ctx);
+    iterator = cdr(iterator);
+  }
+
+  auto f = makeVectorAst(vector);
+  return f;
+}
+
+Value vectorLength(Value arguments, Context ctx) {
+  auto arg1 = car(arguments);
+  auto vector = astToVector(arg1);
+  return makeIntegerAst(vector.length);
+}
+
+Value vectorRef(Value arguments, Context ctx) {
+  auto arg1 = car(arguments);
+  auto vector = astToVector(arg1);
+
+  auto arg2 = car(cdr(arguments));
+  long i = astToInteger(arg2);
+
+  return vector[i];
+}
+
+Value vectorP(Value arguments, Context ctx) {
+  auto arg1 = car(arguments);
+  return makeBoolAst(astIsVector(arg1));
+}
+
+Value vectorSet(Value arguments, Context ctx) {
+  auto arg1 = car(arguments);
+  string symbol = astToSymbol(arg1);
+  auto value = eval(arg1, ctx);
+
+  auto arg2 = eval(car(cdr(arguments)), ctx);
+  long index = astToInteger(arg2);
+
+  auto arg3 = eval(car(cdr(cdr(arguments))), ctx);
+
+  updateAstVector(astToVector(value), index, arg3);
+  return value;
+}
+
+Value vectorFill(Value arguments, Context ctx) {
+  auto arg1 = car(arguments);
+  string symbol = astToSymbol(arg1);
+  auto value = eval(arg1, ctx);
+  auto vector = astToVector(vector);
+
+  auto arg2 = eval(car(cdr(arguments)), ctx);
+
+  long start = 0, end = vector.length;
+
+  auto cddr = cdr(cdr(arguments));
+  if (!astIsNil(cddr)) {
+    auto arg3 = eval(car(cddr), ctx);
+    start = astToInteger(arg3);
+
+    auto cdddr = cdr(cddr);
+    if (!astIsNil(cdddr)) {
+      auto arg4 = eval(car(cdddr), ctx)
+      end = astToInteger(arg4);
+    }
+  }
+
+  for (int i = start; i < end; i++) {
+    updateAstVector(vector, i, arg2);
+  }
+
+  return value;
+}
+
 class Context {
   Value[string] map;
   Value function(Value, Context)[string] builtins;
@@ -611,9 +686,16 @@ class Context {
       "string-downcase": &stringDowncase,
       "substring": &substring,
       "string->list": &stringToList,
-      //"string-ci=?" &stringCIEquals,
-      //"string-foldcase": &stringFoldcase,
-      //"string-copy": &stringCopy,
+      "vector-length": &vectorLength,
+      "vector-ref": &vectorRef,
+      "vector?": &vectorP,
+      //"make-vector": &makeVector,
+      // "vector->list": &vectorToList,
+      // "list->vector": &listToVector,
+      // "vector->string": &vectorToString,
+      // "string->vector": &stringToVector,
+      // "vector-copy": &vectorCopy,
+      // "vector-append": &vectorAppend,
     ];
 
     this.builtinSpecials = [
@@ -626,7 +708,9 @@ class Context {
       "quote": &quote,
       "string-set!": &stringSet,
       "string-fill!": &stringFill,
-      //"string-copy!" &stringCopyMut,
+      "vector": &vectorFun,
+      "vector-set!": &vectorSet,
+      "vector-fill!": &vectorFill,
     ];
   }
 
