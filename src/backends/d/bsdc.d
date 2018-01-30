@@ -131,7 +131,7 @@ Value compile(Value value, Context* ctx, Program* pgm) {
       string argumentsAsList = "nilValue";
       if (arguments.length > 1) {
         argumentsAsList = format("vectorToList([%s])", arguments.join(", "));
-      } else if (arguments.length == 1) {
+      } else if (arguments.length == 1 && arguments[0] != "") {
         argumentsAsList = format("makeListValue(%s, nilValue)", arguments[0]);
       }
 

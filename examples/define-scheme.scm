@@ -1,5 +1,4 @@
-(define a (cons 3 (cons 2 (cons 1 (quote ())))))
-
-(display (car (cdr a)))
-
-(newline)
+(define (main)
+  (define a (cons 3 (cons 2 (cons 1 (quote ())))))
+  (display (car (cdr a)))
+  (newline))
