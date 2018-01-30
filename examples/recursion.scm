@@ -3,5 +3,6 @@
       1
       (* base (exp base (- pow 1)))))
 
-(display (exp 2 62))
-(newline)
+(define (main)
+  (display (exp 2 62))
+  (newline))

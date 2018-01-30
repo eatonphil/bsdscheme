@@ -56,3 +56,11 @@ Value withBegin(Value beginBody) {
   Value beginList = makeListValue(begin, nilValue);
   return appendList(beginList, beginBody);
 }
+
+bool truthy(Value test) {
+  return valueIsInteger(test) && valueToInteger(test) ||
+    valueIsString(test) && valueToString(test).length ||
+    valueIsSymbol(test) ||
+    valueIsFunction(test) ||
+    valueIsBool(test) && valueToBool(test);
+}

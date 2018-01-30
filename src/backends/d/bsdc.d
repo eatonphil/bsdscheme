@@ -15,6 +15,7 @@ struct Program {
   string[] external;
   string[] constants;
   string[] definitions;
+  string[] functionBody;
 }
 
 void compileError(string error) {
@@ -48,11 +49,12 @@ Value compileDefine(Value value, Context* ctx, Program* pgm) {
     Program newPgm;
     Value compiled = compile(withBegin(cdr(value)), &newCtx, &newPgm);
 
-    pgm.definitions ~= format("Value %s(Value %s, void** rest) {%s\n%s\n%s\n}\n",
+    pgm.definitions ~= newPgm.definitions;
+    pgm.definitions ~= format("Value %s(Value %s, void** rest) {%s;\n%s\n%s\n}\n",
                               (*ctx)[symbol],
                               ARGUMENTS,
                               parameters.join(";\n"),
-                              newPgm.definitions.join(";\n") ~ ";",
+                              newPgm.functionBody.join(";\n") ~ ";",
                               valueToString(compiled));
   } else if (valueIsSymbol(definition)) {
     string symbol = valueToSymbol(definition);
@@ -63,10 +65,10 @@ Value compileDefine(Value value, Context* ctx, Program* pgm) {
     bool shadowing = (symbol in (*ctx)) !is null;
     (*ctx)[symbol] = symbol;
 
-    pgm.definitions ~= format("    %s%s = %s",
-                              shadowing ? "" : "Value ",
-                              symbol,
-                              valueToString(compiled));
+    pgm.functionBody ~= format("    %s%s = %s",
+                               shadowing ? "" : "Value ",
+                               symbol,
+                               valueToString(compiled));
   } else {
     // TODO: handle this?
   }
@@ -75,18 +77,34 @@ Value compileDefine(Value value, Context* ctx, Program* pgm) {
 }
 
 Value compileBegin(Value value, Context* ctx, Program* pgm) {
-  string[] expressions;
-
   auto vector = listToVector(value);
   foreach (i, arg; vector) {
     Value compiled = compile(arg, ctx, pgm);
 
     if (!valueIsNil(compiled)) {
-      expressions ~= format("    %s%s", i == vector.length - 1 ? "return " : "", valueToString(compiled));
+      pgm.functionBody ~= format("    %s%s", i == vector.length - 1 ? "return " : "", valueToString(compiled));
     }
   }
 
-  return makeStringValue(expressions.join(";\n") ~ ";");
+  return nilValue;
+}
+
+Value compileIf(Value value, Context* ctx, Program* pgm) {
+  auto vector = listToVector(value);
+  auto arg1 = vector[0];
+  auto test = compile(arg1, ctx, pgm);
+
+  auto arg2 = vector[1];
+  auto ifThen = compile(arg2, ctx, pgm);
+
+  auto arg3 = vector.length == 3 ? vector[2] : nilValue;
+  auto ifElse = compile(arg3, ctx, pgm);
+
+  pgm.functionBody ~= format("    if (truthy(%s)) {\n        return %s;\n    } else {\n        return %s;\n    }",
+                             valueToString(test),
+                             valueToString(ifThen),
+                             valueToString(ifElse));
+  return nilValue;
 }
 
 Value compile(Value value, Context* ctx, Program* pgm) {
@@ -116,6 +134,8 @@ Value compile(Value value, Context* ctx, Program* pgm) {
       return compileDefine(v[1], ctx, pgm);
     case "begin":
       return compileBegin(v[1], ctx, pgm);
+    case "if":
+      return compileIf(v[1], ctx, pgm);
     default:
       if (symbol !in *ctx) {
         compileError(format("Cannot call undefined function %s", symbol));

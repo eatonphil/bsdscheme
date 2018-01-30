@@ -32,11 +32,7 @@ Value ifFun(Value arguments, void** rest) {
 
   auto tuple = valueToList(arguments);
   auto test = eval(tuple[0], cast(void**)[ctx]);
-  auto ok = valueIsInteger(test) && valueToInteger(test) ||
-    valueIsString(test) && valueToString(test).length ||
-    valueIsSymbol(test) ||
-    valueIsFunction(test) ||
-    valueIsBool(test) && valueToBool(test);
+  auto ok = truthy(test);
 
   tuple = valueToList(tuple[1]);
   if (ok) {
