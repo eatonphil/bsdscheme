@@ -5,9 +5,10 @@ import std.functional;
 import std.process;
 import std.stdio;
 
-import ast;
+import common;
 import parse;
 import utility;
+import value;
 
 alias Context = string[string];
 struct Program {
@@ -20,94 +21,84 @@ void compileError(string error) {
   throw new Exception(format("[ERROR]: %s", error));
 }
 
-AST withBegin(AST beginBody) {
-  AST begin = makeSymbolAst("begin");
-  AST beginList = makeListAst(begin, nil);
+Value withBegin(Value beginBody) {
+  Value begin = makeSymbolValue("begin");
+  Value beginList = makeListValue(begin, nilValue);
   return appendList(beginList, beginBody);
 }
 
-AST compileDefine(AST ast, Context* ctx, Program* pgm) {
-  auto definition = car(ast);
+Value compileDefine(Value value, Context* ctx, Program* pgm) {
+  auto definition = car(value);
   auto functionName = car(definition);
-  string symbol = astToString(functionName);
+  string symbol = valueToString(functionName);
 
   auto arg2 = cdr(definition);
   string[] parameters;
 
-  foreach (parameter; listToVector(arg2)) {
+  foreach (i, parameter; listToVector(arg2)) {
+    string argCdrs = "arguments";
+    for (int j = 0; j < i; j++) {
+      argCdrs = format("cdr(%s)", argCdrs);
+    }
+
     auto compiled = compile(parameter, ctx, pgm);
-    parameters ~= format("AST %s", astToString(compiled));
+    parameters ~= format("    Value %s = car(%s);", valueToString(compiled), argCdrs);
   }
 
   (*ctx)[symbol] = format("BSDScheme_%s", symbol);
   Context newCtx = ctx.dup();
-  AST compiled = compile(withBegin(cdr(ast)), &newCtx, pgm);
+  Value compiled = compile(withBegin(cdr(value)), &newCtx, pgm);
 
-  pgm.definitions ~= format("AST %s(%s) {\n%s\n}\n", (*ctx)[symbol], parameters.join(", "), astToString(compiled));
+  pgm.definitions ~= format("Value %s(Value arguments) {\n%s\n%s\n}\n",
+                            (*ctx)[symbol],
+                            parameters.join("\n"),
+                            valueToString(compiled));
 
-  return nil;
+  return nilValue;
 }
 
-AST compilePlus(AST ast, Context* ctx, Program* pgm) {
-  string[] parameters;
-  foreach (arg; listToVector(ast)) {
-    auto compiled = compile(arg, ctx, pgm);
-    parameters ~= format("astToInteger(%s)", astToString(compiled));
-  }
-
-  return makeStringAst(format("makeIntegerAst(%s)", parameters.join(" + ")));
-}
-
-AST compileBegin(AST ast, Context* ctx, Program* pgm) {
+Value compileBegin(Value value, Context* ctx, Program* pgm) {
   string[] expressions;
 
-  auto vector = listToVector(ast);
+  auto vector = listToVector(value);
   foreach (i, arg; vector) {
-    AST compiled = compile(arg, ctx, pgm);
-    if (!astIsNil(compiled)) {
-      expressions ~= format("    %s%s", i == vector.length - 1 ? "return " : "", astToString(compiled));
+    Value compiled = compile(arg, ctx, pgm);
+
+    if (!valueIsNil(compiled)) {
+      expressions ~= format("    %s%s", i == vector.length - 1 ? "return " : "", valueToString(compiled));
     }
   }
 
-  return makeStringAst(expressions.join(";\n") ~ ";");
+  return makeStringValue(expressions.join(";\n") ~ ";");
 }
 
-AST compileDisplay(AST ast, Context* ctx, Program* pgm) {
-  auto compiled = compile(car(ast), ctx, pgm);
-  return makeStringAst(format("{writeln(formatAst(%s)); return nil;}()", astToString(compiled)));
-}
+Value compile(Value value, Context* ctx, Program* pgm) {
+  switch (tagOfValue(value)) {
+  case ValueTag.Symbol:
+    auto string = valueToSymbol(value);
+    return makeStringValue(string);
+  case ValueTag.String:
+    auto string = valueToString(value);
+    return makeStringValue(format("makeStringValue(\"%s\")", string));
+  case ValueTag.Integer:
+    auto i = valueToInteger(value);
+    return makeStringValue(format("makeIntegerValue(%d)", i));
+  case ValueTag.Bool:
+    auto b = valueToBool(value);
+    return makeStringValue(format("makeBoolValue(%s)", b ? "true" : "false"));
+  case ValueTag.Char:
+    auto c = valueToChar(value);
+    return makeStringValue(format("makeCharValue('%c')", c));
+  case ValueTag.List:
+    Value result;
+    auto v = valueToList(value);
 
-AST compile(AST ast, Context* ctx, Program* pgm) {
-  switch (tagOfAst(ast)) {
-  case ASTTag.Symbol:
-    auto string = astToSymbol(ast);
-    return makeStringAst(string);
-  case ASTTag.String:
-    auto string = astToString(ast);
-    return makeStringAst(format("makeStringAst(\"%s\")", string));
-  case ASTTag.Integer:
-    auto i = astToInteger(ast);
-    return makeStringAst(format("makeIntegerAst(%d)", i));
-  case ASTTag.Bool:
-    auto b = astToBool(ast);
-    return makeStringAst(format("makeBoolAst(%s)", b ? "true" : "false"));
-  case ASTTag.Char:
-    auto c = astToChar(ast);
-    return makeStringAst(format("makeCharAst('%c')", c));
-  case ASTTag.List:
-    AST result;
-    auto v = astToList(ast);
-
-    string symbol = astToString(v[0]);
+    string symbol = valueToString(v[0]);
     switch (symbol) {
     case "begin":
       return compileBegin(v[1], ctx, pgm);
     case "define":
       return compileDefine(v[1], ctx, pgm);
-    case "display":
-      return compileDisplay(v[1], ctx, pgm);
-    case "+":
-      return compilePlus(v[1], ctx, pgm);
     default:
       if (symbol !in *ctx) {
         compileError(format("Cannot call undefined function %s", symbol));
@@ -116,14 +107,21 @@ AST compile(AST ast, Context* ctx, Program* pgm) {
       string[] arguments;
       foreach (arg; listToVector(v[1])) {
         auto compiled = compile(arg, ctx, pgm);
-        arguments ~= astToString(compiled);
+        arguments ~= valueToString(compiled);
       }
 
       string functionName = (*ctx)[symbol];
-      return makeStringAst(format("%s(%s)", functionName, arguments.join(", ")));
+      string argumentsAsList = "nilValue";
+      if (arguments.length > 1) {
+        argumentsAsList = format("vectorToList([%s])", arguments.join(", "));
+      } else if (arguments.length == 1) {
+        argumentsAsList = format("makeListValue(%s, nilValue)", arguments[0]);
+      }
+
+      return makeStringValue(format("%s(%s)", functionName, argumentsAsList));
     }
   default:
-    return nil;
+    return nilValue;
   }
 }
 
@@ -133,6 +131,8 @@ void generate(Program pgm, string outFile) {
   foreach (line; pgm.external) {
     f.writeln(line);
   }
+
+  f.writeln();
 
   foreach (line; pgm.constants) {
     f.writeln(line);
@@ -159,19 +159,53 @@ void build(string buildFile, string[] localDImports, string outFile) {
 
 int main(string[] args) {
   auto source = cast(char[])read(args[1]);
-  AST ast = parse.read(source);
+  Value value = parse.read(source);
 
-  Context ctx;
+  Context ctx = [
+    "+": "plus",
+    "-": "minus",
+    "*": "times",
+    "=": "equals",
+    "cons": "cons",
+    "car": "_car",
+    "cdr": "_cdr",
+    "begin": "begin",
+    "display": "display",
+    "newline": "newline",
+    "read": "_read",
+    "include": "include",
+    "string?": "stringP",
+    "make-string": "makeString",
+    "string": "stringFun",
+    "string-length": "stringLength",
+    "string-ref": "stringRef",
+    "string=?": "stringEquals",
+    "string-append": "stringAppend",
+    "list->string": "listToString",
+    "string-upcase": "stringUpcase",
+    "string-downcase": "stringDowncase",
+    "substring": "substring",
+    "string->list": "stringToList",
+    "vector-length": "vectorLength",
+    "vector-ref": "vectorRef",
+    "vector?": "vectorP",
+    "vector->string": "vectorToString",
+    "string->vector": "stringToVector",
+    "vector->list": "_vectorToList",
+    "list->vector": "_listToVector",
+    "vector-append": "vectorAppend",
+    "make-vector": "makeVector",
+  ];
   Program pgm;
-  compile(withBegin(ast), &ctx, &pgm);
+  compile(withBegin(value), &ctx, &pgm);
 
   string[] dImports = ["std.stdio"];
-  string[] localDImports = ["ast", "utility"];
+  string[] localDImports = ["lex", "common", "parse", "utility", "value"];
 
   foreach (imp; dImports ~ localDImports) {
     pgm.external ~= format("import %s;", imp);
   }
-  pgm.definitions ~= "void main() { BSDScheme_main(); }";
+  pgm.definitions ~= "void main() { BSDScheme_main(nilValue); }";
 
   auto buildFile = args.length > 2 ? args[2] : "a.d";
   generate(pgm, buildFile);

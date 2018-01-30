@@ -1,49 +1,52 @@
-import ast;
+import value;
 
-AST nil = { data: 0, header: ASTTag.Nil };
+Value nilValue = { data: 0, header: ValueTag.Nil };
+Value zeroValue = makeIntegerValue(0);
+Value trueValue = makeBoolValue(true);
+Value falseValue = makeBoolValue(false);
 
-AST appendList(AST l1, AST l2) {
-  if (astIsNil(l1)) {
+Value appendList(Value l1, Value l2) {
+  if (valueIsNil(l1)) {
     return l2;
   }
 
-  auto tuple = astToList(l1);
-  AST car = tuple[0];
-  AST cdr = appendList(tuple[1], l2);
-  return makeListAst(car, cdr);
+  auto tuple = valueToList(l1);
+  Value car = tuple[0];
+  Value cdr = appendList(tuple[1], l2);
+  return makeListValue(car, cdr);
 }
 
-AST reverseList(AST value) {
-  if (astIsList(value)) {
-    auto tuple = astToList(value);
+Value reverseList(Value value) {
+  if (valueIsList(value)) {
+    auto tuple = valueToList(value);
     return appendList(reverseList(tuple[1]),
-                      makeListAst(tuple[0], nil));
+                      makeListValue(tuple[0], nilValue));
   }
 
   return value;
 }
 
-AST car(AST arguments) {
-  return astToList(arguments)[0];
+Value car(Value arguments) {
+  return valueToList(arguments)[0];
 }
 
-AST cdr(AST arguments) {
-  return astToList(arguments)[1];
+Value cdr(Value arguments) {
+  return valueToList(arguments)[1];
 }
 
-AST[] listToVector(AST list) {
-  AST[] vector;
-  while (!astIsNil(list)) {
+Value[] listToVector(Value list) {
+  Value[] vector;
+  while (!valueIsNil(list)) {
     vector ~= car(list);
     list = cdr(list);
   }
   return vector;
 }
 
-AST vectorToList(AST[] vector) {
-  AST list;
+Value vectorToList(Value[] vector) {
+  Value list;
   foreach (i; vector) {
-    list = appendList(list, makeListAst(i, nil));
+    list = appendList(list, makeListValue(i, nilValue));
   }
   return list;
 }
