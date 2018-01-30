@@ -100,7 +100,7 @@ Value namedLambda(Value arguments, Context ctx, string name) {
     } else if (valueIsSymbol(funArguments)) {
       auto key = valueToSymbol(funArguments);
       newCtx.set(key, car(parameters));
-    } else {
+    } else if (!valueIsNil(funArguments)) {
       error("Expected symbol or list in lambda formals", funArguments);
     }
 

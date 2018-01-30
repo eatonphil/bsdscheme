@@ -22,31 +22,54 @@ void compileError(string error) {
 }
 
 Value compileDefine(Value value, Context* ctx, Program* pgm) {
+  const string ARGUMENTS = "arguments";
   auto definition = car(value);
-  auto functionName = car(definition);
-  string symbol = valueToString(functionName);
 
-  auto arg2 = cdr(definition);
-  string[] parameters;
+  // (define (fn ...) ...)
+  if (valueIsList(definition)) {
+    auto functionName = car(definition);
+    string symbol = valueToSymbol(functionName);
 
-  foreach (i, parameter; listToVector(arg2)) {
-    string argCdrs = "arguments";
-    for (int j = 0; j < i; j++) {
-      argCdrs = format("cdr(%s)", argCdrs);
+    auto arg2 = cdr(definition);
+    string[] parameters;
+
+    foreach (i, parameter; listToVector(arg2)) {
+      string argCdrs = ARGUMENTS;
+      for (int j = 0; j < i; j++) {
+        argCdrs = format("cdr(%s)", argCdrs);
+      }
+
+      auto compiled = compile(parameter, ctx, pgm);
+      parameters ~= format("    Value %s = car(%s)", valueToString(compiled), argCdrs);
     }
 
-    auto compiled = compile(parameter, ctx, pgm);
-    parameters ~= format("    Value %s = car(%s);", valueToString(compiled), argCdrs);
+    (*ctx)[symbol] = format("BSDScheme_%s", symbol);
+    Context newCtx = ctx.dup();
+    Program newPgm;
+    Value compiled = compile(withBegin(cdr(value)), &newCtx, &newPgm);
+
+    pgm.definitions ~= format("Value %s(Value %s, void** rest) {%s\n%s\n%s\n}\n",
+                              (*ctx)[symbol],
+                              ARGUMENTS,
+                              parameters.join(";\n"),
+                              newPgm.definitions.join(";\n") ~ ";",
+                              valueToString(compiled));
+  } else if (valueIsSymbol(definition)) {
+    string symbol = valueToSymbol(definition);
+
+    auto arg2 = car(cdr(value));
+    auto compiled = compile(arg2, ctx, pgm);
+
+    bool shadowing = (symbol in (*ctx)) !is null;
+    (*ctx)[symbol] = symbol;
+
+    pgm.definitions ~= format("    %s%s = %s",
+                              shadowing ? "" : "Value ",
+                              symbol,
+                              valueToString(compiled));
+  } else {
+    // TODO: handle this?
   }
-
-  (*ctx)[symbol] = format("BSDScheme_%s", symbol);
-  Context newCtx = ctx.dup();
-  Value compiled = compile(withBegin(cdr(value)), &newCtx, pgm);
-
-  pgm.definitions ~= format("Value %s(Value arguments, void** rest) {\n%s\n%s\n}\n",
-                            (*ctx)[symbol],
-                            parameters.join("\n"),
-                            valueToString(compiled));
 
   return nilValue;
 }
