@@ -226,7 +226,7 @@ void updateValueVector(Value v, long index, Value element) {
   vector[index] = element;
 }
 
-Value makeFunctionValue(string name, Value delegate(Value, ...) f, bool special) {
+Value makeFunctionValue(string name, Value delegate(Value, void**) f, bool special) {
   void* namePtr = copyString(name)[0];
   Value v;
   v.header = ValueTag.Function;
@@ -242,13 +242,13 @@ Value makeFunctionValue(string name, Value delegate(Value, ...) f, bool special)
 
 bool valueIsFunction(Value v) { return isValue(v, ValueTag.Function); }
 
-Tuple!(string, Value delegate(Value, ...), bool) valueToFunction(Value v) {
-  Value delegate(Value, ...) f;
+Tuple!(string, Value delegate(Value, void**), bool) valueToFunction(Value v) {
+  Value delegate(Value, void**) f;
   long* tuple = cast(long*)v.data;
   bool special = cast(bool)(tuple[0] & (pow(2, HEADER_TAG_WIDTH) - 1));
   void* namePtr = cast(void*)(tuple[0] >> HEADER_TAG_WIDTH);
   string name = fromStringz(cast(char*)namePtr).dup;
   f.ptr = cast(void*)tuple[1];
-  f.funcptr = cast(Value function(Value, ...))(tuple[2]);
-  return Tuple!(string, Value delegate(Value, ...), bool)(name, f, special);
+  f.funcptr = cast(Value function(Value, void**))(tuple[2]);
+  return Tuple!(string, Value delegate(Value, void**), bool)(name, f, special);
 }

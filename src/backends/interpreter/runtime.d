@@ -12,11 +12,26 @@ import value;
 import parse;
 import utility;
 
-Value ifFun(Value arguments, ...) {
-  Context ctx = va_arg!Context(_argptr);
+Value mapValues(Value delegate(Value, void** rest) f, Value arguments, void** rest) {
+  Context ctx = cast(Context)(*rest);
+  Value mapped;
+  auto tmp = arguments;
+
+  while (valueIsList(tmp)) {
+    auto tuple = valueToList(tmp);
+    Value mappedElement = f(tuple[0], cast(void**)[ctx]);
+    mapped = appendList(mapped, makeListValue(mappedElement, nilValue));
+    tmp = tuple[1];
+  }
+
+  return mapped;
+}
+
+Value ifFun(Value arguments, void** rest) {
+  Context ctx = cast(Context)(*rest);
 
   auto tuple = valueToList(arguments);
-  auto test = eval(tuple[0], ctx);
+  auto test = eval(tuple[0], cast(void**)[ctx]);
   auto ok = valueIsInteger(test) && valueToInteger(test) ||
     valueIsString(test) && valueToString(test).length ||
     valueIsSymbol(test) ||
@@ -25,30 +40,15 @@ Value ifFun(Value arguments, ...) {
 
   tuple = valueToList(tuple[1]);
   if (ok) {
-    return eval(tuple[0], ctx);
+    return eval(tuple[0], cast(void**)[ctx]);
   }
 
   // TODO: support no second argument
-  return eval(car(tuple[1]), ctx);
+  return eval(car(tuple[1]), cast(void**)[ctx]);
 }
 
-Value mapValues(Value delegate(Value, ...) f, Value arguments, ...) {
-  Context ctx = va_arg!Context(_argptr);
-  Value mapped;
-  auto tmp = arguments;
-
-  while (valueIsList(tmp)) {
-    auto tuple = valueToList(tmp);
-    Value mappedElement = f(tuple[0], ctx);
-    mapped = appendList(mapped, makeListValue(mappedElement, nilValue));
-    tmp = tuple[1];
-  }
-
-  return mapped;
-}
-
-Value let(Value arguments, ...) {
-  Context ctx = va_arg!Context(_argptr);
+Value let(Value arguments, void** rest) {
+  Context ctx = cast(Context)(*rest);
 
   auto tuple = valueToList(arguments);
   auto bindings = tuple[0];
@@ -60,7 +60,7 @@ Value let(Value arguments, ...) {
   while (true) {
     auto bindingTuple = valueToList(tmp[0]);
     auto key = valueToSymbol(bindingTuple[0]);
-    auto value = eval(car(bindingTuple[1]), ctx);
+    auto value = eval(car(bindingTuple[1]), cast(void**)[ctx]);
     newCtx.set(key, value);
 
     if (valueIsList(tmp[1])) {
@@ -70,14 +70,14 @@ Value let(Value arguments, ...) {
     }
   }
 
-  return eval(letBody, newCtx);
+  return eval(letBody, cast(void**)[cast(void*)newCtx]);
 }
 
 Value namedLambda(Value arguments, Context ctx, string name) {
   auto funArguments = car(arguments);
   auto funBody = cdr(arguments);
 
-  Value defined(Value parameters, ...) {
+  Value defined(Value parameters, void** rest) {
     Context newCtx = ctx.dup();
 
     if (valueIsList(funArguments)) {
@@ -104,21 +104,19 @@ Value namedLambda(Value arguments, Context ctx, string name) {
       error("Expected symbol or list in lambda formals", funArguments);
     }
 
-    auto begin = makeSymbolValue("begin");
-    auto withBegin = makeListValue(begin, funBody);
-    return eval(withBegin, newCtx);
+    return eval(withBegin(funBody), cast(void**)[cast(void*)newCtx]);
   }
 
   return makeFunctionValue(name, &defined, false);
 }
 
-Value lambda(Value arguments, ...) {
-  Context ctx = va_arg!Context(_argptr);
+Value lambda(Value arguments, void** rest) {
+  Context ctx = cast(Context)(*rest);
   return namedLambda(arguments, ctx, "lambda");
 }
 
-Value define(Value arguments, ...) {
-  Context ctx = va_arg!Context(_argptr);
+Value define(Value arguments, void** rest) {
+  Context ctx = cast(Context)(*rest);
   auto tuple = valueToList(arguments);
   auto name = valueToSymbol(tuple[0]);
   Value value = nilValue;
@@ -132,7 +130,7 @@ Value define(Value arguments, ...) {
     if (valueIsNil(tuple[1])) {
       error("expected value to bind to symbol", tuple[0]);
     } else { // (define a 4)
-      value = eval(valueToList(tuple[1])[0], ctx);
+      value = eval(valueToList(tuple[1])[0], cast(void**)[ctx]);
     }
   }
 
@@ -140,26 +138,27 @@ Value define(Value arguments, ...) {
   return value;
 }
 
-Value setFun(Value arguments, ...) {
-  Context ctx = va_arg!Context(_argptr);
+Value setFun(Value arguments, void** rest) {
+  Context ctx = cast(Context)(*rest);
   auto tuple = valueToList(arguments);
   auto name = valueToSymbol(tuple[0]);
-  auto value = eval(car(tuple[1]), ctx);
+  auto value = eval(car(tuple[1]), cast(void**)[ctx]);
   ctx.set(name, value);
   return value;
 }
 
-Value eval(Value value, ...) {
-  Context ctx = va_arg!Context(_argptr);
+Value eval(Value value, void** rest) {
+  Context ctx = cast(Context)(*rest);
 
   switch (tagOfValue(value)) {
   case ValueTag.Symbol:
-    return ctx.get(valueToSymbol(value));
+    auto r = ctx.get(valueToSymbol(value));
+    return r;
     break;
   case ValueTag.List:
     auto v = valueToList(value);
 
-    auto car = eval(v[0], ctx);
+    auto car = eval(v[0], cast(void**)[ctx]);
     auto cdr = v[1];
 
     if (!valueIsFunction(car)) {
@@ -175,10 +174,10 @@ Value eval(Value value, ...) {
     auto args = v[1];
     // Evaluate all arguments unless this is a special function.
     if (!fnIsSpecial) {
-      args = mapValues(toDelegate(&eval), args, ctx);
+      args = mapValues(toDelegate(&eval), args, cast(void**)[ctx]);
     }
 
-    return fnDelegate(args, ctx);
+    return fnDelegate(args, cast(void**)[ctx]);
     break;
   default:
     return value;
@@ -186,67 +185,60 @@ Value eval(Value value, ...) {
   }
 }
 
-Value _eval(Value arguments, ...) {
-  Context ctx = va_arg!Context(_argptr);
-  return eval(eval(car(arguments), ctx), ctx);
+Value _eval(Value arguments, void** rest) {
+  Context ctx = cast(Context)(*rest);
+  return eval(eval(car(arguments), cast(void**)[ctx]), cast(void**)[ctx]);
 }
 
-Value _read(Value arguments, ...) {
-  Value arg1 = car(arguments);
-  string s = valueToString(arg1);
-  string sWithBegin = format("(begin %s)", s);
-  return quote(parse.read(sWithBegin.dup), va_arg!Context(_argptr));
-}
-
-Value include(Value arguments, ...) {
-  Context ctx = va_arg!Context(_argptr);
+Value include(Value arguments, void** rest) {
+  Context ctx = cast(Context)(*rest);
   Value arg1 = car(arguments);
   string includeFile = valueToString(arg1);
   string fileContents = (cast(char[])read(includeFile)).dup;
   Value source = makeStringValue(fileContents);
   Value readArgs = makeListValue(source, nilValue);
-  Value parsed = _read(readArgs, ctx);
-  return eval(parsed, ctx);
+  Value parsed = _read(readArgs, cast(void**)[ctx]);
+  return eval(parsed, cast(void**)[ctx]);
 }
 
-Value stringSet(Value arguments, ...) {
-  Context ctx = va_arg!Context(_argptr);
+Value stringSet(Value arguments, void** rest) {
+  Context ctx = cast(Context)(*rest);
 
   auto arg1 = car(arguments);
   auto symbol = valueToSymbol(arg1);
-  auto value = eval(arg1, ctx);
+  auto value = eval(arg1, cast(void**)[ctx]);
 
-  auto arg2 = eval(car(cdr(arguments)), ctx);
+  auto arg2 = eval(car(cdr(arguments)), cast(void**)[ctx]);
   long k = valueToInteger(arg2);
 
-  auto arg3 = eval(car(cdr(cdr(arguments))), ctx);
+  auto arg3 = eval(car(cdr(cdr(arguments))), cast(void**)[ctx]);
   char c = valueToChar(arg3);
 
   updateValueString(value, k, c);
   return value;
 }
 
-Value stringFill(Value arguments, ...) {
-  Context ctx = va_arg!Context(_argptr);
+Value stringFill(Value arguments, void** rest) {
+  Context ctx = cast(Context)(*rest);
 
   auto arg1 = car(arguments);
   string symbol = valueToSymbol(arg1);
-  auto value = eval(arg1, ctx);
+  auto value = eval(arg1, cast(void**)[ctx]);
   char[] s = valueToString(value).dup;
 
-  auto arg2 = eval(car(cdr(arguments)), ctx);
+  auto arg2 = eval(car(cdr(arguments)), cast(void**)[ctx]);
   char c = valueToChar(arg2);
 
   long start = 0, end = s.length;
 
   auto cddr = cdr(cdr(arguments));
   if (!valueIsNil(cddr)) {
-    auto arg3 = eval(car(cddr), ctx);
+    auto arg3 = eval(car(cddr), cast(void**)[ctx]);
     start = valueToInteger(arg3);
 
     auto cdddr = cdr(cddr);
     if (!valueIsNil(cdddr)) {
-      auto arg4 = eval(car(cdddr), ctx);
+      auto arg4 = eval(car(cdddr), cast(void**)[ctx]);
       end = valueToInteger(arg4);
     }
   }
@@ -260,13 +252,13 @@ Value stringFill(Value arguments, ...) {
   return value;
 }
 
-Value vectorFun(Value arguments, ...) {
-  Context ctx = va_arg!Context(_argptr);
+Value vectorFun(Value arguments, void** rest) {
+  Context ctx = cast(Context)(*rest);
 
   Value[] vector;
   auto iterator = car(arguments);
   while (!valueIsNil(iterator)) {
-    vector ~= eval(car(iterator), ctx);
+    vector ~= eval(car(iterator), cast(void**)[ctx]);
     iterator = cdr(iterator);
   }
 
@@ -274,42 +266,42 @@ Value vectorFun(Value arguments, ...) {
   return f;
 }
 
-Value vectorSet(Value arguments, ...) {
-  Context ctx = va_arg!Context(_argptr);
+Value vectorSet(Value arguments, void** rest) {
+  Context ctx = cast(Context)(*rest);
 
   auto arg1 = car(arguments);
   string symbol = valueToSymbol(arg1);
-  auto value = eval(arg1, ctx);
+  auto value = eval(arg1, cast(void**)[ctx]);
 
-  auto arg2 = eval(car(cdr(arguments)), ctx);
+  auto arg2 = eval(car(cdr(arguments)), cast(void**)[ctx]);
   long index = valueToInteger(arg2);
 
-  auto arg3 = eval(car(cdr(cdr(arguments))), ctx);
+  auto arg3 = eval(car(cdr(cdr(arguments))), cast(void**)[ctx]);
 
   updateValueVector(value, index, arg3);
   return value;
 }
 
-Value vectorFill(Value arguments, ...) {
-  Context ctx = va_arg!Context(_argptr);
+Value vectorFill(Value arguments, void** rest) {
+  Context ctx = cast(Context)(*rest);
 
   auto arg1 = car(arguments);
   string symbol = valueToSymbol(arg1);
-  auto value = eval(arg1, ctx);
+  auto value = eval(arg1, cast(void**)[ctx]);
   auto vector = valueToVector(value);
 
-  auto arg2 = eval(car(cdr(arguments)), ctx);
+  auto arg2 = eval(car(cdr(arguments)), cast(void**)[ctx]);
 
   long start = 0, end = vector.length;
 
   auto cddr = cdr(cdr(arguments));
   if (!valueIsNil(cddr)) {
-    auto arg3 = eval(car(cddr), ctx);
+    auto arg3 = eval(car(cddr), cast(void**)[ctx]);
     start = valueToInteger(arg3);
 
     auto cdddr = cdr(cddr);
     if (!valueIsNil(cdddr)) {
-      auto arg4 = eval(car(cdddr), ctx);
+      auto arg4 = eval(car(cdddr), cast(void**)[ctx]);
       end = valueToInteger(arg4);
     }
   }
@@ -323,8 +315,8 @@ Value vectorFill(Value arguments, ...) {
 
 class Context {
   Value[string] map;
-  Value function(Value, ...)[string] builtins;
-  Value function(Value, ...)[string] builtinSpecials;
+  Value function(Value, void** rest)[string] builtins;
+  Value function(Value, void** rest)[string] builtinSpecials;
 
   this() {
     this.builtins = [

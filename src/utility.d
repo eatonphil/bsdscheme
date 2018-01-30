@@ -50,3 +50,9 @@ Value vectorToList(Value[] vector) {
   }
   return list;
 }
+
+Value withBegin(Value beginBody) {
+  Value begin = makeSymbolValue("begin");
+  Value beginList = makeListValue(begin, nilValue);
+  return appendList(beginList, beginBody);
+}

@@ -27,7 +27,7 @@ Value reduceValues(Value delegate(Value, Value) f, Value arguments, ref Value in
   return result;
 }
 
-Value plus(Value arguments, ...) {
+Value plus(Value arguments, void** rest) {
   Value _plus(Value previous, Value current) {
     if (valueIsBigInteger(previous) || valueIsBigInteger(current)) {
       BigInt a, b;
@@ -63,7 +63,7 @@ Value plus(Value arguments, ...) {
   return reduceValues(&_plus, arguments, zeroValue);
 }
 
-Value times(Value arguments, ...) {
+Value times(Value arguments, void** rest) {
   Value _times(Value previous, Value current) {
     if (valueIsBigInteger(previous) || valueIsBigInteger(current)) {
       BigInt a, b;
@@ -100,7 +100,7 @@ Value times(Value arguments, ...) {
 }
 
 // TODO: unify plus and minus
-Value minus(Value arguments, ...) {
+Value minus(Value arguments, void** rest) {
   Value _minus(Value previous, Value current) {
     if (valueIsBigInteger(previous) || valueIsBigInteger(current)) {
       BigInt a, b;
@@ -137,7 +137,7 @@ Value minus(Value arguments, ...) {
   return reduceValues(&_minus, tuple[1], tuple[0]);
 }
 
-Value equals(Value arguments, ...) {
+Value equals(Value arguments, void** rest) {
   auto tuple = valueToList(arguments);
   auto left = tuple[0];
   auto right = car(tuple[1]);
@@ -170,34 +170,34 @@ Value equals(Value arguments, ...) {
   return makeBoolValue(b);
 }
 
-Value display(Value arguments, ...) {
+Value display(Value arguments, void** rest) {
   Value head = car(arguments);
   write(formatValue(head));
   return nilValue;
 }
 
-Value newline(Value arguments, ...) {
+Value newline(Value arguments, void** rest) {
   write("\n");
   return nilValue;
 }
 
-Value quote(Value arguments, ...) {
+Value quote(Value arguments, void** rest) {
   return car(arguments);
 }
 
-Value cons(Value arguments, ...) {
+Value cons(Value arguments, void** rest) {
   return arguments;
 }
 
-Value _car(Value arguments, ...) {
+Value _car(Value arguments, void** rest) {
   return car(car(arguments));
 }
 
-Value _cdr(Value arguments, ...) {
+Value _cdr(Value arguments, void** rest) {
   return valueToList(car(arguments))[1];
 }
 
-Value begin(Value arguments, ...) {
+Value begin(Value arguments, void** rest) {
   Value result = arguments;
   auto tmp = valueToList(arguments);
 
@@ -214,13 +214,13 @@ Value begin(Value arguments, ...) {
   return result;
 }
 
-Value stringP(Value arguments, ...) {
+Value stringP(Value arguments, void** rest) {
   auto arg1 = car(arguments);
   bool b = valueIsString(arg1);
   return makeBoolValue(b);
 }
 
-Value makeString(Value arguments, ...) {
+Value makeString(Value arguments, void** rest) {
   auto arg1 = car(arguments);
   long k = valueToInteger(arg1);
   char[] s;
@@ -228,9 +228,9 @@ Value makeString(Value arguments, ...) {
 
   char fill = '\0';
 
-  auto rest = cdr(arguments);
-  if (!valueIsNil(rest)) {
-    auto arg2 = car(cdr(arguments));
+  auto _cdr = cdr(arguments);
+  if (!valueIsNil(_cdr)) {
+    auto arg2 = car(_cdr);
     fill = valueToChar(arg2);
   }
 
@@ -241,7 +241,7 @@ Value makeString(Value arguments, ...) {
   return makeStringValue(s.dup);
 }
 
-Value stringFun(Value arguments, ...) {
+Value stringFun(Value arguments, void** rest) {
   string s = "";
 
   auto iterator = arguments;
@@ -255,13 +255,13 @@ Value stringFun(Value arguments, ...) {
   return makeStringValue(s);
 }
 
-Value stringLength(Value arguments, ...) {
+Value stringLength(Value arguments, void** rest) {
   auto arg1 = car(arguments);
   long l = valueToString(arg1).length;
   return makeIntegerValue(l);
 }
 
-Value stringRef(Value arguments, ...) {
+Value stringRef(Value arguments, void** rest) {
   auto arg1 = car(arguments);
   auto arg2 = car(cdr(arguments));
   string s = valueToString(arg1);
@@ -269,7 +269,7 @@ Value stringRef(Value arguments, ...) {
   return makeCharValue(s[i]);
 }
 
-Value stringEquals(Value arguments, ...) {
+Value stringEquals(Value arguments, void** rest) {
   auto arg1 = car(arguments);
   string s = valueToString(arg1);
 
@@ -285,7 +285,7 @@ Value stringEquals(Value arguments, ...) {
   return makeBoolValue(true);
 }
 
-Value stringAppend(Value arguments, ...) {
+Value stringAppend(Value arguments, void** rest) {
   string s = "";
 
   auto iterator = arguments;
@@ -298,23 +298,23 @@ Value stringAppend(Value arguments, ...) {
   return makeStringValue(s);
 }
 
-Value listToString(Value arguments, ...) {
-  return stringFun(car(arguments));
+Value listToString(Value arguments, void** rest) {
+  return stringFun(car(arguments), cast(void**)0);
 }
 
-Value stringUpcase(Value arguments, ...) {
+Value stringUpcase(Value arguments, void** rest) {
   auto arg1 = car(arguments);
   auto s = valueToString(arg1);
   return makeStringValue(toUpper(s));
 }
 
-Value stringDowncase(Value arguments, ...) {
+Value stringDowncase(Value arguments, void** rest) {
   auto arg1 = car(arguments);
   auto s = valueToString(arg1);
   return makeStringValue(toLower(s));
 }
 
-Value substring(Value arguments, ...) {
+Value substring(Value arguments, void** rest) {
   auto arg1 = car(arguments);
   char[] s = valueToString(arg1).dup;
 
@@ -327,7 +327,7 @@ Value substring(Value arguments, ...) {
   return makeStringValue(s[start .. end].dup);
 }
 
-Value stringToList(Value arguments, ...) {
+Value stringToList(Value arguments, void** rest) {
   auto arg1 = car(arguments);
   char[] s = valueToString(arg1).dup;
 
@@ -342,13 +342,13 @@ Value stringToList(Value arguments, ...) {
   return value;
 }
 
-Value vectorLength(Value arguments, ...) {
+Value vectorLength(Value arguments, void** rest) {
   auto arg1 = car(arguments);
   auto vector = valueToVector(arg1);
   return makeIntegerValue(vector.length);
 }
 
-Value vectorRef(Value arguments, ...) {
+Value vectorRef(Value arguments, void** rest) {
   auto arg1 = car(arguments);
   auto vector = valueToVector(arg1);
 
@@ -358,12 +358,12 @@ Value vectorRef(Value arguments, ...) {
   return vector[i];
 }
 
-Value vectorP(Value arguments, ...) {
+Value vectorP(Value arguments, void** rest) {
   auto arg1 = car(arguments);
   return makeBoolValue(valueIsVector(arg1));
 }
 
-Value vectorToString(Value arguments, ...) {
+Value vectorToString(Value arguments, void** rest) {
   auto arg1 = car(arguments);
   auto vector = valueToVector(arg1);
 
@@ -376,7 +376,7 @@ Value vectorToString(Value arguments, ...) {
   return makeStringValue(s);
 }
 
-Value stringToVector(Value arguments, ...) {
+Value stringToVector(Value arguments, void** rest) {
   auto arg1 = car(arguments);
   auto s = valueToString(arg1);
 
@@ -389,16 +389,16 @@ Value stringToVector(Value arguments, ...) {
   return makeVectorValue(v);
 }
 
-Value _vectorToList(Value arguments, ...) {
+Value _vectorToList(Value arguments, void** rest) {
   auto arg1 = car(arguments);
   return vectorToList(valueToVector(arg1));
 }
 
-Value _listToVector(Value arguments, ...) {
+Value _listToVector(Value arguments, void** rest) {
   return makeVectorValue(listToVector(car(arguments)));
 }
 
-Value vectorAppend(Value arguments, ...) {
+Value vectorAppend(Value arguments, void** rest) {
   Value[] vector;
 
   auto iterator = arguments;
@@ -412,14 +412,14 @@ Value vectorAppend(Value arguments, ...) {
   return makeVectorValue(vector);
 }
 
-Value makeVector(Value arguments, ...) {
+Value makeVector(Value arguments, void** rest) {
   auto arg1 = car(arguments);
   auto k = valueToInteger(arg1);
 
   char c = '\0';
-  auto rest = cdr(arguments);
-  if (!valueIsNil(rest)) {
-    auto arg2 = car(rest);
+  auto _cdr = cdr(arguments);
+  if (!valueIsNil(_cdr)) {
+    auto arg2 = car(_cdr);
     c = valueToChar(arg2);
   }
 
@@ -431,4 +431,11 @@ Value makeVector(Value arguments, ...) {
   }
 
   return makeVectorValue(v);
+}
+
+Value _read(Value arguments, void** rest) {
+  Value arg1 = car(arguments);
+  string s = valueToString(arg1);
+  string sWithBegin = format("(begin %s)", s);
+  return quote(parse.read(sWithBegin.dup), cast(void**)0);
 }

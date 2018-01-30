@@ -13,14 +13,14 @@ void info() {
 
 void repl() {
   string line;
-  auto ctx = new Context;
+  Context ctx = new Context;
   write("> ");
   while ((line = readln()) !is null) {
     line = line.strip();
 
     if (line.length) {
       Value value = car(read(line.dup));
-      eval(value, ctx);
+      eval(value, cast(void**)[ctx]);
     }
 
     write("> ");
@@ -29,12 +29,12 @@ void repl() {
 
 int main(string[] args) {
   if (args.length > 1) {
-    auto ctx = new Context;
+    Context ctx = new Context;
     auto include = makeSymbolValue("include");
     auto source = makeStringValue(args[1]);
     auto includeArgs = makeListValue(source, nilValue);
     auto topLevelItem = makeListValue(include, includeArgs);
-    eval(topLevelItem, ctx);
+    eval(topLevelItem, cast(void**)[ctx]);
   } else {
     info();
     repl();

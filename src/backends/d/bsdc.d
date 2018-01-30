@@ -21,12 +21,6 @@ void compileError(string error) {
   throw new Exception(format("[ERROR]: %s", error));
 }
 
-Value withBegin(Value beginBody) {
-  Value begin = makeSymbolValue("begin");
-  Value beginList = makeListValue(begin, nilValue);
-  return appendList(beginList, beginBody);
-}
-
 Value compileDefine(Value value, Context* ctx, Program* pgm) {
   auto definition = car(value);
   auto functionName = car(definition);
@@ -49,7 +43,7 @@ Value compileDefine(Value value, Context* ctx, Program* pgm) {
   Context newCtx = ctx.dup();
   Value compiled = compile(withBegin(cdr(value)), &newCtx, pgm);
 
-  pgm.definitions ~= format("Value %s(Value arguments) {\n%s\n%s\n}\n",
+  pgm.definitions ~= format("Value %s(Value arguments, void** rest) {\n%s\n%s\n}\n",
                             (*ctx)[symbol],
                             parameters.join("\n"),
                             valueToString(compiled));
@@ -95,10 +89,10 @@ Value compile(Value value, Context* ctx, Program* pgm) {
 
     string symbol = valueToString(v[0]);
     switch (symbol) {
-    case "begin":
-      return compileBegin(v[1], ctx, pgm);
     case "define":
       return compileDefine(v[1], ctx, pgm);
+    case "begin":
+      return compileBegin(v[1], ctx, pgm);
     default:
       if (symbol !in *ctx) {
         compileError(format("Cannot call undefined function %s", symbol));
@@ -118,7 +112,7 @@ Value compile(Value value, Context* ctx, Program* pgm) {
         argumentsAsList = format("makeListValue(%s, nilValue)", arguments[0]);
       }
 
-      return makeStringValue(format("%s(%s)", functionName, argumentsAsList));
+      return makeStringValue(format("%s(%s, cast(void**)0)", functionName, argumentsAsList));
     }
   default:
     return nilValue;
@@ -169,11 +163,9 @@ int main(string[] args) {
     "cons": "cons",
     "car": "_car",
     "cdr": "_cdr",
-    "begin": "begin",
     "display": "display",
     "newline": "newline",
     "read": "_read",
-    "include": "include",
     "string?": "stringP",
     "make-string": "makeString",
     "string": "stringFun",
@@ -205,7 +197,7 @@ int main(string[] args) {
   foreach (imp; dImports ~ localDImports) {
     pgm.external ~= format("import %s;", imp);
   }
-  pgm.definitions ~= "void main() { BSDScheme_main(nilValue); }";
+  pgm.definitions ~= "void main() { BSDScheme_main(nilValue, cast(void**)0); }";
 
   auto buildFile = args.length > 2 ? args[2] : "a.d";
   generate(pgm, buildFile);
