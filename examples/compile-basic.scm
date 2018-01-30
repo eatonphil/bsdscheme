@@ -2,4 +2,5 @@
   (+ a b))
 
 (define (main)
-  (display (plus 1 2)))
+  (display (plus 1 2))
+  (newline))

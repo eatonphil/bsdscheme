@@ -2,11 +2,10 @@ import std.stdio;
 import std.string;
 
 import parse;
-import ast;
 import utility;
+import value;
 
 import runtime;
-import value;
 
 void info() {
   writeln("BSDScheme v0.0.0");
@@ -14,14 +13,14 @@ void info() {
 
 void repl() {
   string line;
-  auto ctx = new Context;
+  Context ctx = new Context;
   write("> ");
   while ((line = readln()) !is null) {
     line = line.strip();
 
     if (line.length) {
-      AST ast = car(read(line.dup));
-      eval(ast, ctx);
+      Value value = car(read(line.dup));
+      eval(value, cast(void**)[ctx]);
     }
 
     write("> ");
@@ -30,12 +29,17 @@ void repl() {
 
 int main(string[] args) {
   if (args.length > 1) {
-    auto ctx = new Context;
-    auto include = makeSymbolAst("include");
-    auto source = makeStringAst(args[1]);
-    auto includeArgs = makeListAst(source, nilValue);
-    auto topLevelItem = makeListAst(include, includeArgs);
-    eval(topLevelItem, ctx);
+    Context ctx = new Context;
+    auto include = makeSymbolValue("include");
+    auto source = makeStringValue(args[1]);
+    auto includeArgs = makeListValue(source, nilValue);
+    auto topLevelItem = makeListValue(include, includeArgs);
+    eval(topLevelItem, cast(void**)[ctx]);
+
+    if (!valueIsNil(ctx.get("main"))) {
+      auto fn = valueToFunction(ctx.get("main"));
+      fn[1](nilValue, cast(void**)0);
+    }
   } else {
     info();
     repl();
