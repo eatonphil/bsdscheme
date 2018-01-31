@@ -373,6 +373,20 @@ Value stacktrace(Value arguments, void** rest) {
   return nilValue;
 }
 
+Value begin(Value arguments, void** rest) {
+  Value result = arguments;
+
+  auto iterator = arguments;
+  while (!valueIsNil(iterator)) {
+    auto exp = car(iterator);
+    bool tcoPosition = valueIsNil(cdr(iterator));
+    result = eval(exp, rest, tcoPosition);
+    iterator = cdr(iterator);
+  }
+
+  return result;
+}
+
 class Context {
   Buffer!(Tuple!(string, Delegate)) callingContext;
   Delegate doTailCall;
@@ -389,7 +403,6 @@ class Context {
       "cons": &cons,
       "car": &_car,
       "cdr": &_cdr,
-      "begin": &begin,
       "display": &display,
       "newline": &newline,
       "read": &_read,
@@ -419,6 +432,7 @@ class Context {
     ];
 
     this.builtinSpecials = [
+      "begin": &begin,
       "if": &ifFun,
       "let": &let,
       "let*": &letStar,
