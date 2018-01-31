@@ -25,7 +25,7 @@ Value mapValues(Value delegate(Value, void**, bool) f, Value arguments, void** r
 
   auto iterator = arguments;
   while (valueIsList(iterator)) {
-    Value mappedElement = f(car(iterator), rest, valueIsNil(cdr(iterator)));
+    Value mappedElement = f(car(iterator), rest, false);
     mapped = appendList(mapped, makeListValue(mappedElement, nilValue));
     iterator = cdr(iterator);
   }

@@ -1,8 +1,8 @@
-(define (exp base pow accum)
+(define (exp base pow)
   (if (= pow 0)
-      accum
-      (exp base (- pow 1) (* accum base))))
+      1
+      (* base (exp base (- pow 1)))))
 
 (define (main)
-  (display (exp 2 100 1))
+  (display (exp 2 16))
   (newline))
