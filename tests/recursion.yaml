@@ -24,10 +24,10 @@ cases:
 templates:
 - test.scm: |
 
-    (define (exp base pow)
+    (define (exp base pow accum)
       (if (= pow 0)
-          1
-          (* base (exp base (- pow 1)))))
+          accum
+          (exp base (- pow 1) (* accum base))))
 
     (define (main)
-      (display (exp {{ b }} {{ p }})))
+      (display (exp {{ b }} {{ p }} 1)))

@@ -1,0 +1,5 @@
+(define (main)
+  (let* ((a 1)
+         (b (+ 1 a)))
+    (display (+ a b))
+    (newline)))

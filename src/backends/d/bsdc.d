@@ -235,7 +235,7 @@ int main(string[] args) {
   compile(withBegin(value), &ctx, &pgm);
 
   string[] dImports = ["std.stdio"];
-  string[] localDImports = ["lex", "common", "parse", "utility", "value"];
+  string[] localDImports = ["lex", "common", "parse", "utility", "value", "buffer"];
 
   foreach (imp; dImports ~ localDImports) {
     pgm.external ~= format("import %s;", imp);
