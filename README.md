@@ -81,10 +81,9 @@ $ ./a
   * Read / eval / include
   * Comments
   * Command-line REPL
+  * `if`, `let`, `define`, `begin` tail calls optimized
 * Missing (but planned, R7RS is the obvious goal):
-  * Tail-call optimization
   * Macros
-  * Dotted pair syntax
   * Labelled let
   * Modules
   * D FFI
