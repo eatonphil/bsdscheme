@@ -36,9 +36,9 @@ int main(string[] args) {
     auto topLevelItem = makeListValue(include, includeArgs);
     eval(topLevelItem, cast(void**)[ctx]);
 
-    if (!valueIsNil(ctx.get("main"))) {
+    if (!valueIsNil(ctx.get("main", false))) {
       auto fn = valueToFunction(ctx.get("main"));
-      fn[1](nilValue, cast(void**)0);
+      fn[1](nilValue, cast(void**)[ctx]);
     }
   } else {
     info();

@@ -299,7 +299,7 @@ Value stringAppend(Value arguments, void** rest) {
 }
 
 Value listToString(Value arguments, void** rest) {
-  return stringFun(car(arguments), cast(void**)0);
+  return stringFun(car(arguments), null);
 }
 
 Value stringUpcase(Value arguments, void** rest) {
@@ -437,5 +437,5 @@ Value _read(Value arguments, void** rest) {
   Value arg1 = car(arguments);
   string s = valueToString(arg1);
   string sWithBegin = format("(begin %s)", s);
-  return quote(parse.read(sWithBegin.dup), cast(void**)0);
+  return quote(parse.read(sWithBegin.dup), null);
 }
