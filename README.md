@@ -25,16 +25,17 @@ $ make
 ### Recursion
 
 ```
-$ cat examples/recursion.scm
-(define (exp base pow)
+$ cat examples/recursion-tco.scm
+(define (exp base pow accum)
   (if (= pow 0)
-      1
-      (* base (exp base (- pow 1)))))
+      accum
+      (exp base (- pow 1) (* accum base))))
 
-(display (exp 2 64))
-(newline)
+(define (main)
+  (display (exp 2 100 1))
+  (newline))
 $ ./bin/bsdi examples/exp.scm
-18446744073709551616
+1267650600228229401496703205376
 ```
 
 ### Read/eval
