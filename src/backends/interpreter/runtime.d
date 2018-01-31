@@ -2,11 +2,13 @@ import core.stdc.stdlib;
 import core.vararg;
 import std.algorithm;
 import std.bigint;
+import std.conv;
 import std.file : read;
 import std.format;
 import std.functional;
 import std.stdio;
 import std.string;
+import std.typecons;
 import std.uni;
 
 import common;
@@ -15,12 +17,15 @@ import parse;
 import utility;
 import buffer;
 
-Value mapValues(Value delegate(Value, void** rest) f, Value arguments, void** rest) {
+alias Delegate = Value delegate(Value, void**);
+alias Function = Value function(Value, void**);
+
+Value mapValues(Value delegate(Value, void**, bool) f, Value arguments, void** rest) {
   Value mapped;
 
   auto iterator = arguments;
   while (valueIsList(iterator)) {
-    Value mappedElement = f(car(iterator), rest);
+    Value mappedElement = f(car(iterator), rest, valueIsNil(cdr(iterator)));
     mapped = appendList(mapped, makeListValue(mappedElement, nilValue));
     iterator = cdr(iterator);
   }
@@ -35,7 +40,7 @@ Value ifFun(Value arguments, void** rest) {
   auto ifBody = cdr(arguments);
 
   if (ok) {
-    return eval(car(ifBody), rest);
+    return eval(car(ifBody), rest, true);
   }
 
   auto ifElse = cdr(ifBody);
@@ -43,7 +48,7 @@ Value ifFun(Value arguments, void** rest) {
     return nilValue;
   }
 
-  return eval(car(ifElse), rest);
+  return eval(car(ifElse), rest, true);
 }
 
 Value letVariant(Value arguments, void** rest, bool star, bool rec) {
@@ -103,40 +108,49 @@ Value namedLambda(Value arguments, Context ctx, string name) {
     auto runtimeCallingContext = runtimeCtx.callingContext;
     newCtx.callingContext = runtimeCallingContext.dup;
 
-    if (valueIsList(funArguments)) {
-      auto keyTmp = valueToList(funArguments);
-      auto valueTmp = valueToList(parameters);
-      while (true) {
-        auto key = valueToSymbol(keyTmp[0]);
-        auto value = valueTmp[0];
+    Value result;
+    bool tailCalling = false;
+    while (true) {
+      if (valueIsList(funArguments)) {
+        auto keyTmp = valueToList(funArguments);
+        auto valueTmp = valueToList(parameters);
+        while (true) {
+          auto key = valueToSymbol(keyTmp[0]);
+          auto value = valueTmp[0];
 
-        newCtx.set(key, value);
+          newCtx.set(key, value);
 
-        // TODO: handle arg count mismatch
-        if (valueIsList(keyTmp[1])) {
-          keyTmp = valueToList(keyTmp[1]);
-          valueTmp = valueToList(valueTmp[1]);
-        } else {
-          break;
+          // TODO: handle arg count mismatch
+          if (valueIsList(keyTmp[1])) {
+            keyTmp = valueToList(keyTmp[1]);
+            valueTmp = valueToList(valueTmp[1]);
+          } else {
+            break;
+          }
         }
+      } else if (valueIsSymbol(funArguments)) {
+        auto key = valueToSymbol(funArguments);
+        newCtx.set(key, car(parameters));
+      } else if (!valueIsNil(funArguments)) {
+        error("Expected symbol or list in lambda formals", funArguments);
       }
-    } else if (valueIsSymbol(funArguments)) {
-      auto key = valueToSymbol(funArguments);
-      newCtx.set(key, car(parameters));
-    } else if (!valueIsNil(funArguments)) {
-      error("Expected symbol or list in lambda formals", funArguments);
+
+      if (!tailCalling) {
+        newCtx.callingContext.push(Tuple!(string, Delegate)(name, &defined));
+      }
+
+      result = eval(withBegin(funBody), cast(void**)[newCtx]);
+
+      if (newCtx.doTailCall == &defined) {
+        tailCalling = true;
+        parameters = result;
+        newCtx.doTailCall = null;
+      } else {
+        break;
+      }
     }
 
-    int nameCount = 0;
-    for (int i = 0; i < newCtx.callingContext.index; i++) {
-      if (newCtx.callingContext.buffer[i].startsWith(name)) {
-        nameCount++;
-      }
-    }
-
-    newCtx.callingContext.push(format("%s_%d", name, nameCount));
-
-    return eval(withBegin(funBody), cast(void**)[newCtx]);
+    return result;
   }
 
   return makeFunctionValue(name, &defined, false);
@@ -179,7 +193,7 @@ Value setFun(Value arguments, void** rest) {
   return value;
 }
 
-Value eval(Value value, void** rest) {
+Value eval(Value value, void** rest, bool tailCallPosition) {
   Context ctx = cast(Context)(*rest);
 
   switch (tagOfValue(value)) {
@@ -209,12 +223,27 @@ Value eval(Value value, void** rest) {
       args = mapValues(toDelegate(&eval), args, rest);
     }
 
+    if (tailCallPosition) {
+      auto cc = ctx.callingContext;
+      for (int i = 0; i < cc.index; i++) {
+        auto callStackDelegate = cc.buffer[i][1];
+        if (callStackDelegate == fnDelegate) {
+          ctx.doTailCall = fnDelegate;
+          return args;
+        }
+      }
+    }
+
     return fnDelegate(args, rest);
     break;
   default:
     return value;
     break;
   }
+}
+
+Value eval(Value arguments, void** rest) {
+  return eval(arguments, rest, false);
 }
 
 Value _eval(Value arguments, void** rest) {
@@ -339,16 +368,17 @@ Value stacktrace(Value arguments, void** rest) {
     for (int j = 0; j < i; j++) {
       indent ~= "  ";
     }
-    writeln(format("%s%s", indent, ctx.callingContext.buffer[i]));
+    writeln(format("%s%s", indent, ctx.callingContext.buffer[i][0]));
   }
   return nilValue;
 }
 
 class Context {
-  Buffer!string callingContext;
+  Buffer!(Tuple!(string, Delegate)) callingContext;
+  Delegate doTailCall;
   Value[string] map;
-  Value function(Value, void** rest)[string] builtins;
-  Value function(Value, void** rest)[string] builtinSpecials;
+  Function[string] builtins;
+  Function[string] builtinSpecials;
 
   this() {
     this.builtins = [
@@ -406,7 +436,7 @@ class Context {
       "vector-fill!": &vectorFill,
     ];
 
-    this.callingContext = new Buffer!string();
+    this.callingContext = new Buffer!(Tuple!(string, Delegate))();
   }
 
   Context dup() {
