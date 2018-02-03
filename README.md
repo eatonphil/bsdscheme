@@ -83,10 +83,10 @@ $ ./a
   * Comments
   * Command-line REPL
   * `if`, `let`, `define`, `begin` tail calls optimized
+  * Modules
 * Missing (but planned, R7RS is the obvious goal):
   * Macros
   * Labelled let
-  * Modules
   * D FFI
   * Threading support
 
