@@ -198,8 +198,7 @@ Value eval(Value value, void** rest, bool tailCallPosition) {
 
   switch (tagOfValue(value)) {
   case ValueTag.Symbol:
-    auto r = ctx.get(valueToSymbol(value));
-    return r;
+    return ctx.get(valueToSymbol(value));
     break;
   case ValueTag.List:
     auto v = valueToList(value);
@@ -250,7 +249,7 @@ Value _eval(Value arguments, void** rest) {
   return eval(eval(car(arguments), rest), rest);
 }
 
-Value include(Value arguments, void** rest) {
+Value load(Value arguments, void** rest) {
   Value arg1 = car(arguments);
   string includeFile = valueToString(arg1);
   string fileContents = (cast(char[])read(includeFile)).dup;
@@ -360,7 +359,7 @@ Value vectorFill(Value arguments, void** rest) {
   return value;
 }
 
-Value stacktrace(Value arguments, void** rest) {
+Value callstack(Value arguments, void** rest) {
   Context ctx = cast(Context)(*rest);
 
   for (int i = 0; i < ctx.callingContext.index; i++) {
@@ -387,15 +386,99 @@ Value begin(Value arguments, void** rest) {
   return result;
 }
 
+string[] specsToString(Value arguments) {
+  string[] specs;
+
+  foreach (spec; listToVector(arguments)) {
+    if (valueIsList(spec)) {
+      specs ~= specsToString(spec).join(".");
+    } else {
+      specs ~= valueToSymbol(spec);
+    }
+  }
+
+  return specs;
+}
+
+Value defineLibrary(Value arguments, void** rest) {
+  Context ctx = cast(Context)(*rest);
+  // TODO: stop dup-ing when no builtins are imported by default
+  Context libraryCtx = ctx.dup;
+
+  auto arg1 = car(arguments);
+  string library = specsToString(arg1).join(".");
+
+  string[] exports;
+  Value _export(Value arguments, void** rest) {
+    foreach (arg; listToVector(arguments)) {
+      exports ~= valueToSymbol(arg);
+    }
+    return nilValue;
+  }
+
+  libraryCtx.setSpecial("export", &_export);
+
+  foreach (exp; listToVector(cdr(arguments))) {
+    eval(exp, cast(void**)[libraryCtx]);
+  }
+
+  // TODO: support renaming
+  Value _import(Value arguments, void** rest) {
+    Context ctx = cast(Context)(*rest);
+
+    foreach (symbol; exports) {
+      ctx.set(symbol, libraryCtx.get(symbol));
+    }
+
+    return nilValue;
+  }
+
+  libraryCtx.setSpecial("import", &_import);
+
+  ctx.modules[library] = libraryCtx.dup;
+  ctx.modules[library].map.remove("export");
+
+  return nilValue;
+}
+
+Value _import(Value arguments, void** rest) {
+  Context ctx = cast(Context)(*rest);
+  string include = valueToString(ctx.get("#library-include-path#"));
+  foreach (spec; listToVector(arguments)) {
+    Context loadCtx = new Context;
+    string lib = valueIsList(spec) ? specsToString(spec)[0] : valueToSymbol(spec);
+    if (lib in ctx.modules) {
+      loadCtx = ctx.modules[lib];
+    } else {
+      auto filename = makeStringValue(format("%s/%s.scm", include, lib.replace(".", "/")));
+
+      // Compile the file.
+      load(makeListValue(filename, nilValue), cast(void**)[loadCtx]);
+      // Cache the module
+      loadCtx = loadCtx.modules[lib];
+      ctx.modules[lib] = loadCtx;
+    }
+
+    // Copy the exported symbols into the current context.
+    auto fn = valueToFunction(loadCtx.get("import"));
+    fn[1](nilValue, cast(void**)[ctx]);
+  }
+
+  return nilValue;
+}
+
 class Context {
   Buffer!(Tuple!(string, Delegate)) callingContext;
   Delegate doTailCall;
   Value[string] map;
-  Function[string] builtins;
-  Function[string] builtinSpecials;
+  Context[string] modules;
 
   this() {
-    this.builtins = [
+    map = [
+      "#library-include-path#": makeStringValue("src/lib"),
+    ];
+
+    auto builtins = [
       "+": &plus,
       "-": &minus,
       "*": &times,
@@ -406,7 +489,7 @@ class Context {
       "display": &display,
       "newline": &newline,
       "read": &_read,
-      "include": &include,
+      "load": &load,
       "string?": &stringP,
       "make-string": &makeString,
       "string": &stringFun,
@@ -428,10 +511,14 @@ class Context {
       "list->vector": &_listToVector,
       "vector-append": &vectorAppend,
       "make-vector": &makeVector,
-      "stacktrace": &stacktrace,
+      "callstack": &callstack,
     ];
 
-    this.builtinSpecials = [
+    foreach (key, value; builtins) {
+      set(key, makeFunctionValue(key, toDelegate(value), false));
+    }
+
+    auto builtinSpecials = [
       "begin": &begin,
       "if": &ifFun,
       "let": &let,
@@ -448,14 +535,21 @@ class Context {
       "vector": &vectorFun,
       "vector-set!": &vectorSet,
       "vector-fill!": &vectorFill,
+      "import": &_import,
+      "define-library": &defineLibrary,
     ];
 
-    this.callingContext = new Buffer!(Tuple!(string, Delegate))();
+    foreach (key, value; builtinSpecials) {
+      setSpecial(key, toDelegate(value));
+    }
+
+    callingContext = new Buffer!(Tuple!(string, Delegate))();
   }
 
   Context dup() {
     auto dup = new Context();
     dup.map = map.dup;
+    dup.modules = modules.dup;
     dup.callingContext = callingContext.dup;
     return dup;
   }
@@ -464,28 +558,18 @@ class Context {
     this.map[key] = value;
   }
 
+  void setSpecial(string key, Value delegate(Value, void**) value) {
+    this.map[key] = makeFunctionValue(key, value, true);
+  }
+
   Value get(string key, bool failIfNotFound) {
-    Value value;
-    bool found = false;
-
-    if (key in builtins) {
-      value = makeFunctionValue(key, toDelegate(builtins[key]), false);
-      found = true;
-    } else if (key in builtinSpecials) {
-      value = makeFunctionValue(key, toDelegate(builtinSpecials[key]), true);
-      found = true;
-    }
-
     if (key in map) {
-      value = map[key];
-      found = true;
-    }
-
-    if (!found && failIfNotFound) {
+      return map[key];
+    } else if (failIfNotFound) {
       error("Undefined symbol", makeSymbolValue(key));
     }
 
-    return value;
+    return nilValue;
   }
 
   Value get(string key) {

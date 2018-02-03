@@ -30,10 +30,10 @@ void repl() {
 int main(string[] args) {
   if (args.length > 1) {
     Context ctx = new Context;
-    auto include = makeSymbolValue("include");
+    auto load = makeSymbolValue("load");
     auto source = makeStringValue(args[1]);
-    auto includeArgs = makeListValue(source, nilValue);
-    auto topLevelItem = makeListValue(include, includeArgs);
+    auto loadArgs = makeListValue(source, nilValue);
+    auto topLevelItem = makeListValue(load, loadArgs);
     eval(topLevelItem, cast(void**)[ctx]);
 
     if (!valueIsNil(ctx.get("main", false))) {
