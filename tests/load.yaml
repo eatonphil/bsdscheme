@@ -10,7 +10,7 @@ templates:
     
 - test.scm: |
 
-    (include "helper.scm")
+    (load "helper.scm")
 
     (display str)
 
