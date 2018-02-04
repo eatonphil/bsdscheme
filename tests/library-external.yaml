@@ -11,7 +11,7 @@ templates:
          (define (+ a b) (- a b))))
 
 - test.scm: |
-    (set! "*library-include-path" "./")
+    (set! *library-include-path* "./")
 
     (import (helper))
 
