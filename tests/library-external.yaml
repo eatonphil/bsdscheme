@@ -1,0 +1,19 @@
+cases:
+  - name: imports a library defined in an external file
+    status: 0
+    stdout: 3
+
+templates:
+- helper.scm: |
+    (define-library (helper)
+      (export +)
+      (begin
+         (define (+ a b) (- a b))))
+
+- test.scm: |
+    (set! "*library-include-path" "./")
+
+    (import (helper))
+
+    (define (main)
+      (display (+ 7 4))

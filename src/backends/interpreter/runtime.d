@@ -1,6 +1,7 @@
 import core.stdc.stdlib;
 import core.vararg;
 import std.algorithm;
+import std.algorithm.mutation;
 import std.bigint;
 import std.conv;
 import std.file : read;
@@ -443,17 +444,19 @@ Value defineLibrary(Value arguments, void** rest) {
 
 Value _import(Value arguments, void** rest) {
   Context ctx = cast(Context)(*rest);
-  string include = valueToString(ctx.get("#library-include-path#"));
+  string include = valueToString(ctx.get("*library-include-path*"));
   foreach (spec; listToVector(arguments)) {
     Context loadCtx = new Context;
     string lib = valueIsList(spec) ? specsToString(spec)[0] : valueToSymbol(spec);
     if (lib in ctx.modules) {
       loadCtx = ctx.modules[lib];
     } else {
-      auto filename = makeStringValue(format("%s/%s.scm", include, lib.replace(".", "/")));
+      auto fileValue = makeStringValue(format("%s/%s.scm",
+                                              include,
+                                              lib.replace(".", "/")));
 
       // Compile the file.
-      load(makeListValue(filename, nilValue), cast(void**)[loadCtx]);
+      load(makeListValue(fileValue, nilValue), cast(void**)[loadCtx]);
       // Cache the module
       loadCtx = loadCtx.modules[lib];
       ctx.modules[lib] = loadCtx;
@@ -475,7 +478,7 @@ class Context {
 
   this() {
     map = [
-      "#library-include-path#": makeStringValue("src/lib"),
+      "*library-include-path*": makeStringValue("src/lib"),
     ];
 
     auto builtins = [

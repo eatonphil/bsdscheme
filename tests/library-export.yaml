@@ -1,0 +1,18 @@
+cases:
+  - name: library hides non-exported symbols
+    status: 1
+    stdout: "[ERROR]: Undefined symbol p"
+
+templates:
+- helper.scm: |
+    (define-library (helper)
+      (begin
+         (define p 123)))
+
+- test.scm: |
+    (set! "*library-include-path" "./")
+
+    (import (helper))
+
+    (define (main)
+      (display p))
