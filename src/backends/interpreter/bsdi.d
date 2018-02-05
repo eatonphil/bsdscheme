@@ -5,6 +5,8 @@ import parse;
 import utility;
 import value;
 
+import base : include;
+import eval : eval;
 import runtime;
 
 void info() {
@@ -30,11 +32,9 @@ void repl() {
 int main(string[] args) {
   if (args.length > 1) {
     Context ctx = new Context;
-    auto load = makeSymbolValue("load");
     auto source = makeStringValue(args[1]);
-    auto loadArgs = makeListValue(source, nilValue);
-    auto topLevelItem = makeListValue(load, loadArgs);
-    eval(topLevelItem, cast(void**)[ctx]);
+    auto includeArgs = makeListValue(source, nilValue);
+    include(includeArgs, cast(void**)[ctx]);
 
     if (!valueIsNil(ctx.get("main", false))) {
       auto fn = valueToFunction(ctx.get("main"));
