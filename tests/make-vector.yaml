@@ -5,7 +5,7 @@ cases:
 
 templates:
   - test.scm: |
-
+      (import (scheme base) (scheme write))
       (define t (make-vector 3))
       (vector-fill! t "cats")
       (display t)

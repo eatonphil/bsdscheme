@@ -5,5 +5,5 @@ cases:
 
 templates:
 - test.scm: |
-
+    (import (scheme base) (scheme write))
     (display (let ((a 7)) (+ (- 3 2) a 3)))

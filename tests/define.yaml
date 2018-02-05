@@ -5,6 +5,7 @@ cases:
 
 templates:
 - test.scm: |
+    (import (scheme base) (scheme write))
 
     (define (myfun a b) (+ a b))
 

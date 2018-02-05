@@ -5,6 +5,6 @@ cases:
 
 templates:
 - test.scm: |
-
+    (import (scheme base) (scheme write))
     (define x '(+ 1 2))
     (display (eval x))

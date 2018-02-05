@@ -19,7 +19,7 @@ cases:
 
 templates:
 - test.scm: |
-
+    (import (scheme base) (scheme write))
     (define s "Hello")
     (string-fill! s #\T {{ a }})
     (display s)

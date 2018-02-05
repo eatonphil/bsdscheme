@@ -6,6 +6,7 @@ cases:
 templates:
 - helper.scm: |
     (define-library (helper)
+      (import (scheme base))
       (export +)
       (begin
          (define (+ a b) (- a b))))
@@ -13,7 +14,7 @@ templates:
 - test.scm: |
     (set! *library-include-path* "./")
 
-    (import (helper))
+    (import (scheme base) (scheme write) (helper))
 
     (define (main)
       (display (+ 7 4))

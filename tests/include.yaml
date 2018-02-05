@@ -9,8 +9,9 @@ templates:
     (define str "This is my included string")
     
 - test.scm: |
+    (import (scheme base) (scheme write))
 
-    (load "helper.scm")
+    (include "helper.scm")
 
     (display str)
 

@@ -5,5 +5,5 @@ cases:
 
 templates:
 - test.scm: |
-
+    (import (scheme base) (scheme write))
     (display (string-length "Hello world!")

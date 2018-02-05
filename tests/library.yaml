@@ -5,8 +5,10 @@ cases:
 
 templates:
 - test.scm: |
+    (import (scheme base) (scheme write))
 
     (define-library (test)
+      (import (scheme base))
       (export +)
       (begin
          (define (+ a b) (- a b))))

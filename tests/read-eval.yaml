@@ -5,5 +5,5 @@ cases:
 
 templates:
 - test.scm: |
-
+    (import (scheme base) (scheme write))
     (display (eval (read "(+ 1 2)")))

@@ -5,5 +5,5 @@ cases:
 
 templates:
   - test.scm: |
-
+      (import (scheme base) (scheme write))
       (display (vector-append (string->vector "foo") (string->vector "bar")))
