@@ -6,7 +6,7 @@ import runtime;
 
 class SchemeWrite : Context {
   private this() {
-    setSpecial("display", toDelegate(&display));
+    set("display", toDelegate(&display));
     setSpecial("copy-context", makeCopyContext(null, this));
   }
 
