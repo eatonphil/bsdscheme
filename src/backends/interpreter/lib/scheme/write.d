@@ -1,12 +1,13 @@
 import std.functional;
 
 import common;
+import value;
 
 import runtime;
 
 class SchemeWrite : Context {
   private this() {
-    set("display", toDelegate(&display));
+    set("display", makeFunctionValue("display", toDelegate(&display), false));
     setSpecial("copy-context", makeCopyContext(null, this));
   }
 

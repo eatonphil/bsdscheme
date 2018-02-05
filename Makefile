@@ -2,7 +2,7 @@
 
 all: bin/bsdi bin/bsdc
 
-bin/bsdi: src/backends/interpreter/*.d src/backends/interpreter/lib/scheme/*.d src/*.d
+bin/bsdi: src/backends/interpreter/*.d src/backends/interpreter/lib/scheme/*.d src/backends/interpreter/lib/bsds/*.d src/*.d
 	ldc -of $@ $^
 
 bin/bsdc: src/backends/d/*.d src/*.d

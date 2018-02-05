@@ -1,3 +1,5 @@
+(import (scheme base) (scheme write) (bsds debug))
+
 (define (exp base pow accum)
   (if (= pow 0)
       accum

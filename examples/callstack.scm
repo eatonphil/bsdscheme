@@ -1,5 +1,7 @@
+(import (scheme base) (scheme write) (bsds dbg))
+
 (define (b arg)
-  (stacktrace)
+  (callstack)
   (display arg)
   (newline))
 

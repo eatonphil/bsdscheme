@@ -272,19 +272,6 @@ Value vectorFill(Value arguments, void** rest) {
   return value;
 }
 
-Value callstack(Value arguments, void** rest) {
-  Context ctx = cast(Context)(*rest);
-
-  for (int i = 0; i < ctx.callingContext.index; i++) {
-    string indent = "";
-    for (int j = 0; j < i; j++) {
-      indent ~= "  ";
-    }
-    writeln(format("%s%s", indent, ctx.callingContext.buffer[i][0]));
-  }
-  return nilValue;
-}
-
 Value include(Value arguments, void** rest) {
   Value arg1 = car(arguments);
   string includeFile = valueToString(arg1);

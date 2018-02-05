@@ -17,6 +17,8 @@ import parse;
 import utility;
 import buffer;
 
+import dbg;
+
 import base;
 import read;
 import write;
@@ -195,6 +197,7 @@ class Context {
       "scheme.read": SchemeRead.getContext(),
       "scheme.write": SchemeWrite.getContext(),
       "scheme.eval": SchemeEval.getContext(),
+      "bsds.dbg": BSDSDbg.getContext(),
     ];
 
     if (name in modules) {
