@@ -12,9 +12,11 @@ templates:
          (define (+ a b) (- a b))))
 
 - test.scm: |
+    (import (scheme base) (scheme write))
+
     (set! *library-include-path* "./")
 
-    (import (scheme base) (scheme write) (helper))
+    (import (helper))
 
     (define (main)
       (display (+ 7 4))
