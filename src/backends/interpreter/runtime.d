@@ -76,7 +76,6 @@ Value delegate(Value, void**) makeCopyContext(string[] exports, Context libraryC
 }
 
 Value defineLibrary(Value arguments, void** rest) {
-  Context ctx = cast(Context)(*rest);
   Context libraryCtx = new Context;
 
   auto arg1 = car(arguments);
@@ -97,18 +96,15 @@ Value defineLibrary(Value arguments, void** rest) {
   }
 
   libraryCtx.setSpecial("copy-context", makeCopyContext(exports, libraryCtx));
-
-  libraryCtx.map.remove("export");
   modules[library] = libraryCtx;
 
   return nilValue;
 }
 
-static bool modulesInitialized = false;
 static Context[string] modules;
 
 Context getLibraryContext(string path, string lib) {
-  if (!modulesInitialized) {
+  if (!modules.length) {
     auto builtinModules = [
       "scheme.base": SchemeBase.getContext(),
       "scheme.read": SchemeRead.getContext(),
@@ -122,19 +118,17 @@ Context getLibraryContext(string path, string lib) {
     }
   }
 
-  if (lib in modules) {
-    return modules[lib];
+  if (lib !in modules) {
+    auto fileValue = makeStringValue(format("%s/%s.scm",
+                                            path,
+                                            lib.replace(".", "/")));
+
+    // Compile the file.
+    Context ctx = new Context;
+    include(makeListValue(fileValue, nilValue), cast(void**)[ctx]);
   }
 
-  auto fileValue = makeStringValue(format("%s/%s.scm",
-                                          path,
-                                          lib.replace(".", "/")));
-
-  auto ctx = new Context;
-  // Compile the file.
-  include(makeListValue(fileValue, nilValue), cast(void**)[ctx]);
-  modules[lib] = ctx;
-  return ctx;
+  return modules[lib];
 }
 
 Value _import(Value arguments, void** rest) {
