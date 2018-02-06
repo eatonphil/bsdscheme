@@ -5,7 +5,7 @@ cases:
 
 templates:
   - test.scm: |
-
+      (import (scheme base) (scheme write))
       (display (vector->string (string->vector "foobar")))
       (display "|")
       (display (vector->string (list->vector (vector->list (string->vector "foobar1")))))

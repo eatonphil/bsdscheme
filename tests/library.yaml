@@ -1,0 +1,18 @@
+cases:
+  - name: imports a library defined in the same file
+    status: 0
+    stdout: 3
+
+templates:
+- test.scm: |
+    (import (scheme base) (scheme write))
+
+    (define-library (test)
+      (import (scheme base))
+      (export +)
+      (begin
+         (define (+ a b) (- a b))))
+
+    (define (main)
+      (import (test))
+      (display (+ 7 4))

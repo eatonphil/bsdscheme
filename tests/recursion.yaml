@@ -23,6 +23,7 @@ cases:
 
 templates:
 - test.scm: |
+    (import (scheme base) (scheme write))
 
     (define (exp base pow accum)
       (if (= pow 0)

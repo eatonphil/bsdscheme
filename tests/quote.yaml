@@ -5,5 +5,5 @@ cases:
 
 templates:
 - test.scm: |
-
+    (import (scheme base) (scheme write))
     (display (car (cdr (quote (1 + 2)))))

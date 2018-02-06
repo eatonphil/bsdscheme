@@ -13,5 +13,5 @@ cases:
 
 templates:
 - test.scm: |
-
+    (import (scheme base) (scheme write))
     (display (string? {{ v }})

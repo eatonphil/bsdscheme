@@ -25,6 +25,6 @@ cases:
 
 templates:
 - test.scm: |
-
+    (import (scheme base) (scheme write))
     (define s "Hello world!")
     (display (string=? s {{ t }})

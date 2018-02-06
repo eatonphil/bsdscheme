@@ -19,6 +19,6 @@ cases:
 
 templates:
   - test.scm: |
-
+      (import (scheme base) (scheme write))
       (define a {{ pair }})
       (display a)
