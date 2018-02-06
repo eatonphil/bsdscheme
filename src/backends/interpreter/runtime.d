@@ -98,31 +98,51 @@ Value defineLibrary(Value arguments, void** rest) {
 
   libraryCtx.setSpecial("copy-context", makeCopyContext(exports, libraryCtx));
 
-  ctx.modules[library] = libraryCtx.dup;
-  ctx.modules[library].map.remove("export");
+  libraryCtx.map.remove("export");
+  modules[library] = libraryCtx;
 
   return nilValue;
+}
+
+static bool modulesInitialized = false;
+static Context[string] modules;
+
+Context getLibraryContext(string path, string lib) {
+  if (!modulesInitialized) {
+    auto builtinModules = [
+      "scheme.base": SchemeBase.getContext(),
+      "scheme.read": SchemeRead.getContext(),
+      "scheme.write": SchemeWrite.getContext(),
+      "scheme.eval": SchemeEval.getContext(),
+      "bsds.dbg": BSDSDbg.getContext(),
+    ];
+
+    foreach (key, value; builtinModules) {
+      modules[key] = value;
+    }
+  }
+
+  if (lib in modules) {
+    return modules[lib];
+  }
+
+  auto fileValue = makeStringValue(format("%s/%s.scm",
+                                          path,
+                                          lib.replace(".", "/")));
+
+  auto ctx = new Context;
+  // Compile the file.
+  include(makeListValue(fileValue, nilValue), cast(void**)[ctx]);
+  modules[lib] = ctx;
+  return ctx;
 }
 
 Value _import(Value arguments, void** rest) {
   Context ctx = cast(Context)(*rest);
   string path = valueToString(ctx.get("*library-include-path*"));
   foreach (spec; listToVector(arguments)) {
-    Context loadCtx = new Context;
     string lib = valueIsList(spec) ? specsToString(spec) : valueToSymbol(spec);
-    if (ctx.getModule(lib) !is null) {
-      loadCtx = ctx.modules[lib];
-    } else {
-      auto fileValue = makeStringValue(format("%s/%s.scm",
-                                              path,
-                                              lib.replace(".", "/")));
-
-      // Compile the file.
-      include(makeListValue(fileValue, nilValue), cast(void**)[loadCtx]);
-      // Cache the module
-      loadCtx = loadCtx.modules[lib];
-      ctx.modules[lib] = loadCtx;
-    }
+    auto loadCtx = getLibraryContext(path, lib);
 
     // Copy the exported symbols into the current context.
     auto fn = valueToFunction(loadCtx.get("copy-context"));
@@ -150,7 +170,6 @@ class Context {
   Buffer!(Tuple!(string, Delegate)) callingContext;
   Delegate doTailCall;
   Value[string] map;
-  Context[string] modules;
 
   this() {
     set("*library-include-path*", makeStringValue("src/lib"));
@@ -164,7 +183,6 @@ class Context {
   Context dup() {
     auto dup = new Context();
     dup.map = map.dup;
-    dup.modules = modules.dup;
     dup.callingContext = callingContext.dup;
     return dup;
   }
@@ -189,21 +207,5 @@ class Context {
 
   Value get(string key) {
     return get(key, true);
-  }
-
-  Context getModule(string name) {
-    modules = [
-      "scheme.base": SchemeBase.getContext(),
-      "scheme.read": SchemeRead.getContext(),
-      "scheme.write": SchemeWrite.getContext(),
-      "scheme.eval": SchemeEval.getContext(),
-      "bsds.dbg": BSDSDbg.getContext(),
-    ];
-
-    if (name in modules) {
-      return modules[name];
-    }
-
-    return null;
   }
 }
