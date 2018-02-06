@@ -54,7 +54,7 @@ string specsToString(Value arguments) {
   return specs.join(".");
 }
 
-Value delegate(Value, void**) makeCopyContext(string[] exports, Context libraryCtx) {
+Value delegate(Value, void**) makeCopyContext(string[]* exports, Context libraryCtx) {
   // TODO: support renaming
   Value copyContext(Value arguments, void** rest) {
     Context ctx = cast(Context)(*rest);
@@ -64,7 +64,7 @@ Value delegate(Value, void**) makeCopyContext(string[] exports, Context libraryC
         ctx.set(key, value);
       }
     } else {
-      foreach (symbol; exports) {
+      foreach (symbol; *exports) {
         ctx.set(symbol, libraryCtx.get(symbol));
       }
     }
@@ -95,7 +95,7 @@ Value defineLibrary(Value arguments, void** rest) {
     eval(exp, cast(void**)[libraryCtx]);
   }
 
-  libraryCtx.setSpecial("copy-context", makeCopyContext(exports, libraryCtx));
+  libraryCtx.setSpecial("copy-context", makeCopyContext(&exports, libraryCtx));
   modules[library] = libraryCtx;
 
   return nilValue;
