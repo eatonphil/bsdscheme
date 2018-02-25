@@ -1,6 +1,6 @@
 (import (scheme base) (bsds curl) (bsds ffi))
 
-(define-callback (read-body (buffer offset length data))
+(define-callback (read-body ((string buffer) offset length (string data)))
   (string-append! data (substring buffer offset length)))
 
 (define (main)
