@@ -9,4 +9,5 @@
     (easy-setopt +opt-url+ "http://httpbin.org/ip")
     (easy-setopt +opt-writefunction+ read-body)
     (easy-setopt +opt-writedata+ &body)
-    (easy-perform curl)))
+    (easy-perform curl)
+    (display body)))
