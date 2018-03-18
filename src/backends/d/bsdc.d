@@ -1,4 +1,5 @@
 import std.array;
+import std.algorithm;
 import std.file;
 import std.format;
 import std.functional;
@@ -10,174 +11,279 @@ import parse;
 import utility;
 import value;
 
-alias Context = string[string];
-struct Program {
-  string[] external;
-  string[] constants;
-  string[] definitions;
-  string[] functionBody;
+struct Context {
+  string[string] ctx;
+  string[] specialForms;
+
+  this(string[string] initCtx, string[] initSpecialForms) {
+    ctx = initCtx;
+    specialForms = initSpecialForms;
+  }
+
+  string set(string key, string value, bool requireUnique) {
+    if (key in this.ctx) {
+      return this.set(format("%s_1", key), value, requireUnique);
+    }
+
+    this.ctx[key] = value;
+    return key;
+  }
+
+  string set(string key, string value) {
+    return this.set(key, value, true);
+  }
+
+  string get(string key) {
+    return this.ctx[key];
+  }
+
+  void toggleSpecial(string key, bool special) {
+    int index = this.specialForms.canFind(key) - 1;
+    bool currentlySpecial = cast(bool)(index + 1);
+    if (special && !currentlySpecial) {
+      this.specialForms ~= key;
+    } else if (!special && currentlySpecial) {
+      this.specialForms.remove(index);
+    }
+  }
+
+  Context* dup() {
+    auto d = new Context;
+    d.ctx = this.ctx.dup();
+    d.specialForms = this.specialForms;
+    return d;
+  }
+
+  bool contains(string key) {
+    return (key in this.ctx) !is null;
+  }
 }
 
 void compileError(string error) {
   throw new Exception(format("[ERROR]: %s", error));
 }
 
-Value compileDefine(Value value, Context* ctx, Program* pgm) {
-  const string ARGUMENTS = "arguments";
-  auto definition = car(value);
+enum Type {
+  Value,
+  Integer,
+  String,
+  Character,
+};
 
-  // (define (fn ...) ...)
-  if (valueIsList(definition)) {
-    auto functionName = car(definition);
-    string symbol = valueToSymbol(functionName);
+class IR {
+  string id;
+}
 
-    auto arg2 = cdr(definition);
-    string[] parameters;
+class StringIR : IR {
+  this(string value) {
+    id = value;
+  }
+}
 
-    foreach (i, parameter; listToVector(arg2)) {
-      string argCdrs = ARGUMENTS;
-      for (int j = 0; j < i; j++) {
-        argCdrs = format("cdr(%s)", argCdrs);
-      }
+class SymbolIR : IR {
+  this(string value) {
+    id = value;
+  }
+}
 
-      auto compiled = compile(parameter, ctx, pgm);
-      parameters ~= format("    Value %s = car(%s)", valueToString(compiled), argCdrs);
-    }
+class BooleanIR : IR {
+  bool value;
 
-    (*ctx)[symbol] = format("BSDScheme_%s", symbol);
-    Context newCtx = ctx.dup();
-    Program newPgm;
-    Value compiled = compile(withBegin(cdr(value)), &newCtx, &newPgm);
+  this(bool b) {
+    value = b;
+  }
+}
 
-    pgm.definitions ~= newPgm.definitions;
-    pgm.definitions ~= format("Value %s(Value %s, void** rest) {%s;\n%s\n%s\n}\n",
-                              (*ctx)[symbol],
-                              ARGUMENTS,
-                              parameters.join(";\n"),
-                              newPgm.functionBody.join(";\n") ~ ";",
-                              valueToString(compiled));
-  } else if (valueIsSymbol(definition)) {
-    string symbol = valueToSymbol(definition);
+class CharacterIR : IR {
+  char value;
 
-    auto arg2 = car(cdr(value));
-    auto compiled = compile(arg2, ctx, pgm);
+  this(char c) {
+    value = c;
+  }
+}
 
-    bool shadowing = (symbol in (*ctx)) !is null;
-    (*ctx)[symbol] = symbol;
+class IntegerIR : IR {
+  long value;
 
-    pgm.functionBody ~= format("    %s%s = %s",
-                               shadowing ? "" : "Value ",
-                               symbol,
-                               valueToString(compiled));
-  } else {
-    // TODO: handle this?
+  this(long i) {
+    value = i;
+  }
+}
+
+class VariableIR : IR {
+  this(string name) {
+    id = name;
+  }
+}
+
+class FuncallIR : IR {
+  IR[] arguments;
+
+  this(string name, IR[] args) {
+    id = name;
+    arguments = args;
   }
 
-  return nilValue;
-}
-
-Value compileBegin(Value value, Context* ctx, Program* pgm) {
-  auto vector = listToVector(value);
-  foreach (i, arg; vector) {
-    Value compiled = compile(arg, ctx, pgm);
-
-    if (!valueIsNil(compiled)) {
-      pgm.functionBody ~= format("    %s%s", i == vector.length - 1 ? "return " : "", valueToString(compiled));
-    }
-  }
-
-  return nilValue;
-}
-
-Value compileIf(Value value, Context* ctx, Program* pgm) {
-  auto vector = listToVector(value);
-  auto arg1 = vector[0];
-  auto test = compile(arg1, ctx, pgm);
-
-  auto arg2 = vector[1];
-  auto ifThen = compile(arg2, ctx, pgm);
-
-  auto arg3 = vector.length == 3 ? vector[2] : nilValue;
-  auto ifElse = compile(arg3, ctx, pgm);
-
-  pgm.functionBody ~= format("    if (truthy(%s)) {\n        return %s;\n    } else {\n        return %s;\n    }",
-                             valueToString(test),
-                             valueToString(ifThen),
-                             valueToString(ifElse));
-  return nilValue;
-}
-
-Value compile(Value value, Context* ctx, Program* pgm) {
-  switch (tagOfValue(value)) {
-  case ValueTag.Symbol:
-    auto string = valueToSymbol(value);
-    return makeStringValue(string);
-  case ValueTag.String:
-    auto string = valueToString(value);
-    return makeStringValue(format("makeStringValue(\"%s\")", string));
-  case ValueTag.Integer:
-    auto i = valueToInteger(value);
-    return makeStringValue(format("makeIntegerValue(%d)", i));
-  case ValueTag.Bool:
-    auto b = valueToBool(value);
-    return makeStringValue(format("makeBoolValue(%s)", b ? "true" : "false"));
-  case ValueTag.Char:
-    auto c = valueToChar(value);
-    return makeStringValue(format("makeCharValue('%c')", c));
-  case ValueTag.List:
-    Value result;
+  static IR fromAST(Value value, Context* ctx) {
     auto v = valueToList(value);
-
     string symbol = valueToString(v[0]);
+
     switch (symbol) {
     case "define":
-      return compileDefine(v[1], ctx, pgm);
+      return DefineIR.fromAST(v[1], ctx);
     case "begin":
-      return compileBegin(v[1], ctx, pgm);
+      return BeginIR.fromAST(v[1], ctx);
     case "if":
-      return compileIf(v[1], ctx, pgm);
+      return IfIR.fromAST(v[1], ctx);
     default:
-      if (symbol !in *ctx) {
-        compileError(format("Cannot call undefined function %s", symbol));
-      }
-
-      string[] arguments;
-      foreach (arg; listToVector(v[1])) {
-        auto compiled = compile(arg, ctx, pgm);
-        arguments ~= valueToString(compiled);
-      }
-
-      string functionName = (*ctx)[symbol];
-      string argumentsAsList = "nilValue";
-      if (arguments.length > 1) {
-        argumentsAsList = format("vectorToList([%s])", arguments.join(", "));
-      } else if (arguments.length == 1 && arguments[0] != "") {
-        argumentsAsList = format("makeListValue(%s, nilValue)", arguments[0]);
-      }
-
-      return makeStringValue(format("%s(%s, cast(void**)0)", functionName, argumentsAsList));
+      break;
     }
-  default:
-    return nilValue;
+
+    auto fir = new FuncallIR(symbol, []);
+
+    foreach(arg; listToVector(v[1])) {
+      fir.arguments ~= ProgramIR.fromAST(arg, ctx);
+    }
+
+    return fir;
   }
 }
 
-void generate(Program pgm, string outFile) {
+class AssignmentIR : IR {
+  Type type;
+  IR value;
+  bool shadowing;
+
+  this(string assignTo, IR value, bool shadowing) {
+    type = Type.Value;
+    id = assignTo;
+    this.value = value;
+    this.shadowing = shadowing;
+  }
+
+  this(string assignTo, IR value) {
+    this(assignTo, value, false);
+  }
+}
+
+class DefineIR : IR {
+  string name;
+  Context* ctx;
+  IR[] expressions;
+
+  static DefineIR fromAST(Value value, Context* ctx) {
+    auto dir = new DefineIR;
+
+    const string ARGUMENTS = "arguments";
+    auto definition = car(value);
+
+    // (define (fn ...) ...)
+    if (valueIsList(definition)) {
+      auto functionName = car(definition);
+      string symbol = valueToSymbol(functionName);
+      dir.id = symbol;
+
+      auto arg2 = cdr(definition);
+      string[] parameters;
+
+      foreach (i, parameter; listToVector(arg2)) {
+        auto vir = new FuncallIR("nth", [new VariableIR(ARGUMENTS), new IntegerIR(i)]);
+        dir.expressions ~= new AssignmentIR(valueToString(parameter), vir);
+      }
+
+      ctx.set(symbol, format("BSDScheme_%s", symbol));
+      auto newCtx = ctx.dup();
+      auto bir = BeginIR.fromAST(cdr(value), newCtx);
+      dir.expressions = bir.expressions;
+    } else if (valueIsSymbol(definition)) {
+      string symbol = valueToSymbol(definition);
+      dir.id = symbol;
+
+      auto arg2 = car(cdr(value));
+      auto ir = ProgramIR.fromAST(arg2, ctx);
+
+      bool shadowing = ctx.contains(symbol);
+      symbol = ctx.set(symbol, symbol);
+
+      dir.expressions ~= new AssignmentIR(symbol, ir, shadowing);
+    } else {
+      // TODO: handle this?
+    }
+
+    return dir;
+  }
+}
+
+class BeginIR : IR {
+  IR[] expressions;
+
+  static BeginIR fromAST(Value value, Context* ctx) {
+    auto bir = new BeginIR;
+
+    auto vector = listToVector(value);
+    foreach (i, arg; vector) {
+      bir.expressions ~= ProgramIR.fromAST(arg, ctx);
+    }
+
+    return bir;
+  }
+}
+
+class IfIR : IR {
+  IR test;
+  IR ifThen;
+  IR ifElse;
+
+  static IfIR fromAST(Value value, Context* ctx) {
+    auto iir = new IfIR;
+
+    auto vector = listToVector(value);
+    auto arg1 = vector[0];
+    iir.test = ProgramIR.fromAST(arg1, ctx);
+
+    auto arg2 = vector[1];
+    iir.ifThen = ProgramIR.fromAST(arg2, ctx);
+
+    auto arg3 = vector.length == 3 ? vector[2] : nilValue;
+    iir.ifElse = ProgramIR.fromAST(arg3, ctx);
+
+    return iir;
+  }
+}
+
+class ProgramIR {
+  string returnValue;
+
+  static IR fromAST(Value value, Context* ctx) {
+    switch (tagOfValue(value)) {
+    case ValueTag.Symbol:
+      auto string = valueToSymbol(value);
+      return new SymbolIR(string);
+    case ValueTag.String:
+      auto string = valueToString(value);
+      return new StringIR(string);
+    case ValueTag.Integer:
+      auto i = valueToInteger(value);
+      return new IntegerIR(i);
+    case ValueTag.Bool:
+      auto b = valueToBool(value);
+      return new BooleanIR(b);
+    case ValueTag.Char:
+      auto c = valueToChar(value);
+      return new CharacterIR(c);
+    case ValueTag.List:
+      return FuncallIR.fromAST(value, ctx);
+    default:
+      compileError(format("Bad value: %s", tagOfValue(value)));
+      assert(0);
+    }
+  }
+}
+
+void generate(string outFile, string prologue, IR ir, string epilogue) {
   auto f = File(outFile, "w");
 
-  foreach (line; pgm.external) {
-    f.writeln(line);
-  }
-
-  f.writeln();
-
-  foreach (line; pgm.constants) {
-    f.writeln(line);
-  }
-
-  foreach (line; pgm.definitions) {
-    f.writeln(line);
-  }
+  return;
 }
 
 void build(string buildFile, string[] localDImports, string outFile) {
@@ -198,7 +304,7 @@ int main(string[] args) {
   auto source = cast(char[])read(args[1]);
   Value value = parse.read(source);
 
-  Context ctx = [
+  auto ctx = new Context([
     "+": "plus",
     "-": "minus",
     "*": "times",
@@ -230,20 +336,20 @@ int main(string[] args) {
     "list->vector": "_listToVector",
     "vector-append": "vectorAppend",
     "make-vector": "makeVector",
-  ];
-  Program pgm;
-  compile(withBegin(value), &ctx, &pgm);
+  ], []);
+  IR ir = ProgramIR.fromAST(withBegin(value), ctx);
 
   string[] dImports = ["std.stdio"];
   string[] localDImports = ["lex", "common", "parse", "utility", "value", "buffer"];
 
+  string[] prologue;
   foreach (imp; dImports ~ localDImports) {
-    pgm.external ~= format("import %s;", imp);
+    prologue ~= format("import %s;", imp);
   }
-  pgm.definitions ~= "void main() { BSDScheme_main(nilValue, cast(void**)0); }";
+  string epilogue = "void main() { BSDScheme_main(nilValue, cast(void**)0); }";
 
   auto buildFile = args.length > 2 ? args[2] : "a.d";
-  generate(pgm, buildFile);
+  generate(buildFile, prologue.join("\n"), ir, epilogue);
 
   auto outFile = args.length > 3 ? args[3] : "a";
   build(buildFile, localDImports, outFile);
