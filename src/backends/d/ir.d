@@ -195,7 +195,9 @@ class DefineFunctionIR : IR {
 
     foreach (i, parameter; listToVector(arg2)) {
       auto args = [new VariableIR(ARGUMENTS), new IntegerIR(i)];
-      dir.parameters ~= new FuncallIR("nth", args, valueToString(parameter));
+      string p = valueToString(parameter);
+      ctx.set(p, "", true);
+      dir.parameters ~= new FuncallIR("nth", args, p);
     }
 
     if (ctx.contains(symbol)) {

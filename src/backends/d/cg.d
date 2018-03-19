@@ -62,7 +62,9 @@ class FuncallCG : CG {
 
 class DefineFunctionCG : CG {
   static string fromIR(DefineFunctionIR fir) {
-    string functionHeader = format("Value %s(%s) {\n");
+    
+
+    string functionHeader = format("Value %s(Value %s, void** ctx) {\n", fir.name, ARGUMENTS);
     string functionFooter = format("}\n");
 
     string block = "\t";
