@@ -1,7 +1,5 @@
-(define a 4)
-
-(set! a 4)
-
-(display a)
-
-(newline)
+(define (main)
+  (define a 4)
+  (set! a 12)
+  (display a)
+  (newline))
