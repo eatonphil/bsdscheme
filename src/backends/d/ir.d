@@ -183,9 +183,9 @@ class DefineFunctionIR : IR {
     dir.name = format("BSDScheme_%s", symbol);
     ctx.set(symbol, dir.name, false);
 
-    dir.tmp = ctx.set("tmp", "");
-
     auto newCtx = ctx.dup();
+
+    dir.tmp = newCtx.set("tmp", "");
     dir.block = BeginIR.fromAST(block, newCtx);
 
     return dir;
@@ -231,7 +231,6 @@ class DefineIR : IR {
 
 class BeginIR : IR {
   IR[] expressions;
-  string returnVariable;
 
   static BeginIR fromAST(Value value, Context ctx) {
     auto bir = new BeginIR;
@@ -240,8 +239,6 @@ class BeginIR : IR {
     foreach (i, arg; vector) {
       bir.expressions ~= IR.fromAST(arg, ctx);
     }
-
-    bir.returnVariable = ctx.set("begin", "");
 
     return bir;
   }
@@ -276,7 +273,7 @@ class IfIR : IR {
     auto arg3 = vector.length == 3 ? vector[2] : nilValue;
     iir.ifElse = IR.fromAST(arg3, ctx);
 
-    iir.returnVariable = ctx.set("if", "");
+    iir.returnVariable = ctx.set("if_result", "");
 
     return iir;
   }

@@ -95,18 +95,10 @@ class BeginCG : CG {
   static string fromIR(BeginIR bir, bool topLevel) {
     string[] block;
 
-    if (!topLevel) {
-      block ~= format("Value %s", bir.returnVariable);
-    }
-
     if (bir.expressions.length) {
       foreach (expression; bir.expressions) {
         block ~= CG.fromIR(expression, false);
       }
-    }
-
-    if (!topLevel) {
-      block ~= format("%s = %s", bir.returnVariable, CG.fromIR(bir.getReturnIR(), false));
     }
 
     if (topLevel) {
@@ -125,15 +117,18 @@ class DefineCG : CG {
 
 class IfCG : CG {
   static string fromIR(IfIR iir) {
-    return format("\tValue %s;\n\tif (%s) {\n\t%s;\n\t%s = %s\n} else {\n\t%s;\n\t%s = %s\n}",
+    string init = CG.fromIR(iir.test, false);
+
+    return format("%s;\n\tValue %s;\n\tif (valueToBool(%s)) {\n\t%s;\n\t%s = %s;\n\t} else {\n\t%s;\n\t%s = %s;\n\t}",
+                  init,
                   iir.returnVariable,
-                  CG.fromIR(iir.test, false),
+                  CG.fromIR(iir.test.getReturnIR(), false),
                   CG.fromIR(iir.ifThen, false),
                   iir.returnVariable,
-                  iir.ifThen.getReturnIR(),
+                  CG.fromIR(iir.ifThen.getReturnIR(), false),
                   CG.fromIR(iir.ifElse, false),
                   iir.returnVariable,
-                  iir.ifElse.getReturnIR());
+                  CG.fromIR(iir.ifElse.getReturnIR(), false));
   }
 }
 
