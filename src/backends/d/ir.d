@@ -111,6 +111,8 @@ class FuncallIR : IR {
       return LetIR.fromAST(v[1], ctx);
     case "let*":
       return LetStarIR.fromAST(v[1], ctx);
+    case "set!":
+      return SetIR.fromAST(v[1], ctx);
     default:
       break;
     }
@@ -331,5 +333,18 @@ class LetIR : LetXIR {
 class LetStarIR : LetXIR {
   static LetXIR fromAST(Value value, Context ctx) {
     return letXIRFromAST(value, ctx, true);
+  }
+}
+
+class SetIR : IR {
+  static AssignmentIR fromAST(Value value, Context ctx) {
+    auto symbol = valueToString(car(value));
+    auto val = car(cdr(value));
+
+    if (!ctx.contains(symbol)) {
+      irError(format("Attempted to set! undefined symbol: %s", symbol));
+    }
+
+    return new AssignmentIR(symbol, IR.fromAST(val, ctx), true);
   }
 }
