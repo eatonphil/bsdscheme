@@ -20,17 +20,17 @@ class IR {
     case ValueTag.Symbol:
       return VariableIR.fromAST(value, ctx);
     case ValueTag.String:
-      auto string = valueToString(value);
-      return new StringIR(string);
+      auto s = valueToString(value);
+      return new LiteralIR!string(s);
     case ValueTag.Integer:
       auto i = valueToInteger(value);
-      return new IntegerIR(i);
+      return new LiteralIR!long(i);
     case ValueTag.Bool:
       auto b = valueToBool(value);
-      return new BooleanIR(b);
+      return new LiteralIR!bool(b);
     case ValueTag.Char:
       auto c = valueToChar(value);
-      return new CharacterIR(c);
+      return new LiteralIR!char(c);
     case ValueTag.Nil:
       return NilIR.get();
     case ValueTag.List:
@@ -42,7 +42,7 @@ class IR {
   }
 
   IR getReturnIR() {
-    return NilIR.get();
+    return this;
   }
 }
 
@@ -58,35 +58,11 @@ class NilIR : IR {
   }
 }
 
-class StringIR : IR {
-  string value;
+class LiteralIR(T) : IR {
+  T value;
 
-  this(string initValue) {
+  this(T initValue) {
     value = initValue;
-  }
-}
-
-class BooleanIR : IR {
-  bool value;
-
-  this(bool b) {
-    value = b;
-  }
-}
-
-class CharacterIR : IR {
-  char value;
-
-  this(char c) {
-    value = c;
-  }
-}
-
-class IntegerIR : IR {
-  long value;
-
-  this(long i) {
-    value = i;
   }
 }
 
@@ -140,9 +116,11 @@ class FuncallIR : IR {
       assert(0);
     }
 
+    auto fn = ctx.get(symbol);
+
     // ctx.set handles returning a unique symbol.
-    string returnVariable = ctx.set(symbol, "");
-    auto fir = new FuncallIR(symbol, [], returnVariable);
+    string returnVariable = ctx.set(format("%s_result", fn), "");
+    auto fir = new FuncallIR(fn, [], returnVariable);
 
     foreach(arg; listToVector(v[1])) {
       fir.arguments ~= IR.fromAST(arg, ctx);
@@ -180,7 +158,8 @@ const string ARGUMENTS = "arguments";
 
 class DefineFunctionIR : IR {
   string name;
-  IR[] parameters;
+  string tmp;
+  string[] parameters;
   BeginIR block;
 
   static IR fromAST(Value definition, Value block, Context ctx) {
@@ -188,22 +167,24 @@ class DefineFunctionIR : IR {
 
     auto functionName = car(definition);
     string symbol = valueToSymbol(functionName);
-    dir.name = symbol;
 
     auto arg2 = cdr(definition);
     string[] parameters;
 
     foreach (i, parameter; listToVector(arg2)) {
-      auto args = [new VariableIR(ARGUMENTS), new IntegerIR(i)];
       string p = valueToString(parameter);
-      ctx.set(p, "", true);
-      dir.parameters ~= new FuncallIR("nth", args, p);
+      ctx.set(p, "", false);
+      dir.parameters ~= p;
     }
 
     if (ctx.contains(symbol)) {
       irWarning(format("Shadowing assignment: %s", symbol));
     }
-    ctx.set(symbol, format("BSDScheme_%s", symbol), false);
+    dir.name = format("BSDScheme_%s", symbol);
+    ctx.set(symbol, dir.name, false);
+
+    dir.tmp = ctx.set("tmp", "");
+
     auto newCtx = ctx.dup();
     dir.block = BeginIR.fromAST(block, newCtx);
 
@@ -272,8 +253,7 @@ class BeginIR : IR {
     }
 
     auto lastExp = this.expressions[length - 1];
-    auto assignment = new AssignmentIR(returnVariable, lastExp);
-    return assignment.getReturnIR();
+    return lastExp.getReturnIR();
   }
 }
 

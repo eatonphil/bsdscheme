@@ -19,7 +19,7 @@ void generate(string outFile, string prologue, IR ir, string epilogue) {
   auto f = File(outFile, "w");
 
   f.write(prologue);
-  f.write(CG.fromIR(ir));
+  f.write(CG.fromIR(ir, true));
   f.write(epilogue);
 }
 
@@ -51,7 +51,9 @@ int main(string[] args) {
   foreach (imp; dImports ~ localDImports) {
     prologue ~= format("import %s;", imp);
   }
-  string epilogue = "void main() { BSDScheme_main(nilValue, cast(void**)0); }";
+  prologue ~= "\n";
+
+  string epilogue = "\nvoid main() { BSDScheme_main(nilValue, cast(void**)0); }";
 
   auto buildFile = args.length > 2 ? args[2] : "a.d";
   generate(buildFile, prologue.join("\n"), ir, epilogue);

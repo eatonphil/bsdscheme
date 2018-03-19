@@ -13,14 +13,14 @@ void cgWarning(string warning) {
 }
 
 class CG {
-  static string fromIR(IR ir) {
-    if (auto sir = cast(StringIR)ir) {
+  static string fromIR(IR ir, bool topLevel) {
+    if (auto sir = cast(LiteralIR!string)ir) {
       return format("makeStringValue(\"%s\")", sir.value);
-    } else if (auto bir = cast(BooleanIR)ir) {
+    } else if (auto bir = cast(LiteralIR!bool)ir) {
       return format("makeBoolValue(%b)", bir.value);
-    } else if (auto cir = cast(CharacterIR)ir) {
+    } else if (auto cir = cast(LiteralIR!char)ir) {
       return format("makeCharValue(%c)", cir.value);
-    } else if (auto iir = cast(IntegerIR)ir) {
+    } else if (auto iir = cast(LiteralIR!long)ir) {
       return format("makeIntegerValue(%d)", iir.value);
     } else if (auto nir = cast(NilIR)ir) {
       return "nilValue";
@@ -31,7 +31,7 @@ class CG {
     } else if (auto dir = cast(DefineIR)ir) {
       return DefineCG.fromIR(dir);
     } else if (auto bir = cast(BeginIR)ir) {
-      return BeginCG.fromIR(bir);
+      return BeginCG.fromIR(bir, topLevel);
     } else if (auto iir = cast(IfIR)ir) {
       return IfCG.fromIR(iir);
     } else if (auto vir = cast(VariableIR)ir) {
@@ -47,13 +47,23 @@ class CG {
 
 class FuncallCG : CG {
   static string fromIR(FuncallIR fir) {
+    string[] argInitializers;
     string[] args;
-
+    
     foreach(arg; fir.arguments) {
-      args ~= CG.fromIR(arg);
+      if (cast(FuncallIR)arg) {
+        argInitializers ~= CG.fromIR(arg, false);
+      }
+      args ~= CG.fromIR(arg.getReturnIR(), false);
     }
 
-    return format("Value %s = %s(%s, null)",
+    string initializers = argInitializers.join(";\n\t");
+    if (argInitializers.length) {
+      initializers ~= ";\n\t";
+    }
+
+    return format("%s\n\tValue %s = %s(vectorToList([%s]), null)",
+                  initializers,
                   fir.returnVariable,
                   fir.name,
                   args.join(", "));
@@ -64,35 +74,44 @@ class DefineFunctionCG : CG {
   static string fromIR(DefineFunctionIR fir) {
     
 
-    string functionHeader = format("Value %s(Value %s, void** ctx) {\n", fir.name, ARGUMENTS);
+    string functionHeader = format("Value %s(Value %s, void** ctx) {", fir.name, ARGUMENTS);
     string functionFooter = format("}\n");
 
-    string block = "\t";
-    foreach (parameter; fir.parameters) {
-      block ~= CG.fromIR(parameter);
-      block ~= ";\n\t";
+
+    string block = format("\n\tValue[] %s = listToVector(%s);\n\t", fir.tmp, ARGUMENTS);
+    foreach (i, parameter; fir.parameters) {
+      block ~= format("Value %s = %s[%d];\n\t", parameter, fir.tmp, i);
     }
 
-    block ~= BeginCG.fromIR(fir.block);
+    block ~= BeginCG.fromIR(fir.block, false);
 
-    block ~= format("\treturn %s;\n", CG.fromIR(fir.getReturnIR()));
+    block ~= format(";\n\treturn %s;\n", CG.fromIR(fir.getReturnIR(), false));
 
     return format("%s%s%s", functionHeader, block, functionFooter);
   }
 }
 
 class BeginCG : CG {
-  static string fromIR(BeginIR bir) {
+  static string fromIR(BeginIR bir, bool topLevel) {
     string[] block;
+
+    if (!topLevel) {
+      block ~= format("Value %s", bir.returnVariable);
+    }
 
     if (bir.expressions.length) {
       foreach (expression; bir.expressions) {
-        block ~= CG.fromIR(expression);
+        block ~= CG.fromIR(expression, false);
       }
     }
 
-    block ~= CG.fromIR(bir.getReturnIR());
+    if (!topLevel) {
+      block ~= format("%s = %s", bir.returnVariable, CG.fromIR(bir.getReturnIR(), false));
+    }
 
+    if (topLevel) {
+      return block.join("\n");
+    }
     return block.join(";\n\t");
   }
 }
@@ -100,7 +119,7 @@ class BeginCG : CG {
 class DefineCG : CG {
   static string fromIR(DefineIR dir) {
     // TODO: support global initialization
-    return CG.fromIR(dir.value);
+    return CG.fromIR(dir.value, false);
   }
 }
 
@@ -108,11 +127,11 @@ class IfCG : CG {
   static string fromIR(IfIR iir) {
     return format("\tValue %s;\n\tif (%s) {\n\t%s;\n\t%s = %s\n} else {\n\t%s;\n\t%s = %s\n}",
                   iir.returnVariable,
-                  CG.fromIR(iir.test),
-                  CG.fromIR(iir.ifThen),
+                  CG.fromIR(iir.test, false),
+                  CG.fromIR(iir.ifThen, false),
                   iir.returnVariable,
                   iir.ifThen.getReturnIR(),
-                  CG.fromIR(iir.ifElse),
+                  CG.fromIR(iir.ifElse, false),
                   iir.returnVariable,
                   iir.ifElse.getReturnIR());
   }
@@ -129,6 +148,6 @@ class AssignmentCG : CG {
     return format("%s%s = %s",
                   air.shadowing ? "" : "Value ",
                   air.assignTo,
-                  CG.fromIR(air.value));
+                  CG.fromIR(air.value, false));
   }
 }
