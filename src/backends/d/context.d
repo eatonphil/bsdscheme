@@ -1,13 +1,13 @@
 import std.algorithm;
 import std.format;
+import std.stdio;
 
 class Context {
   string[string] ctx;
-  string[] specialForms;
+  bool[string] tmps;
 
-  this(string[string] initCtx, string[] initSpecialForms) {
+  this(string[string] initCtx) {
     ctx = initCtx;
-    specialForms = initSpecialForms;
   }
 
   this() {}
@@ -15,43 +15,42 @@ class Context {
   string set(string key, string value, bool requireUnique) {
     if (requireUnique) {
       long i = 0;
-      while (key in this.ctx) {
-        key = format("%s_%d", key, i);
-        i++;
+      while (key in ctx) {
+        key = format("%s_%d", key, i++);
       }
     }
 
-    this.ctx[key] = value;
+    ctx[key] = value;
     return key;
   }
 
   string set(string key, string value) {
-    return this.set(key, value, true);
+    return set(key, value, true);
   }
 
   string get(string key) {
-    return this.ctx[key];
+    return ctx[key];
   }
 
-  void toggleSpecial(string key, bool special) {
-    int index = this.specialForms.canFind(key) - 1;
-    bool currentlySpecial = cast(bool)(index + 1);
-    if (special && !currentlySpecial) {
-      this.specialForms ~= key;
-    } else if (!special && currentlySpecial) {
-      this.specialForms.remove(index);
+  string setTmp(string key) {
+    long i = 0;
+    while ((key in tmps) !is null || contains(key)) {
+      key = format("%s_%d", key, i++);
     }
+
+    tmps[key] = true;
+    return key;
   }
 
   Context dup() {
     auto d = new Context;
-    d.ctx = this.ctx.dup();
-    d.specialForms = this.specialForms;
+    d.ctx = ctx.dup();
+    d.tmps = tmps;
     return d;
   }
 
   bool contains(string key) {
-    return (key in this.ctx) !is null;
+    return (key in ctx) !is null;
   }
 
   static Context getDefault() {
@@ -87,6 +86,6 @@ class Context {
       "list->vector": "_listToVector",
       "vector-append": "vectorAppend",
       "make-vector": "makeVector",
-    ], []);
+    ]);
   }
 }

@@ -109,6 +109,8 @@ class FuncallIR : IR {
       return IfIR.fromAST(v[1], ctx);
     case "let":
       return LetIR.fromAST(v[1], ctx);
+    case "let*":
+      return LetStarIR.fromAST(v[1], ctx);
     default:
       break;
     }
@@ -120,8 +122,7 @@ class FuncallIR : IR {
 
     auto fn = ctx.get(symbol);
 
-    // ctx.set handles returning a unique symbol.
-    string returnVariable = ctx.set(format("%s_result", fn), "");
+    string returnVariable = ctx.setTmp(format("%s_result", fn));
     auto fir = new FuncallIR(fn, [], returnVariable);
 
     foreach (arg; listToVector(v[1])) {
@@ -165,10 +166,16 @@ class DefineFunctionIR : IR {
   BeginIR block;
 
   static IR fromAST(Value definition, Value block, Context ctx) {
-    auto dir = new DefineFunctionIR;
-
     auto functionName = car(definition);
     string symbol = valueToSymbol(functionName);
+
+    auto dir = new DefineFunctionIR;
+
+    if (ctx.contains(symbol)) {
+      irWarning(format("Shadowing assignment: %s", symbol));
+    }
+    dir.name = format("BSDScheme_%s", symbol);
+    ctx.set(symbol, dir.name, false);
 
     auto arg2 = cdr(definition);
     string[] parameters;
@@ -179,15 +186,10 @@ class DefineFunctionIR : IR {
       dir.parameters ~= p;
     }
 
-    if (ctx.contains(symbol)) {
-      irWarning(format("Shadowing assignment: %s", symbol));
-    }
-    dir.name = format("BSDScheme_%s", symbol);
-    ctx.set(symbol, dir.name, false);
-
     auto newCtx = ctx.dup();
+    newCtx.tmps.clear;
 
-    dir.tmp = newCtx.set("tmp", "");
+    dir.tmp = newCtx.setTmp("tmp");
     dir.block = BeginIR.fromAST(block, newCtx);
 
     return dir;
@@ -275,7 +277,7 @@ class IfIR : IR {
     auto arg3 = vector.length == 3 ? vector[2] : nilValue;
     iir.ifElse = IR.fromAST(arg3, ctx);
 
-    iir.returnVariable = ctx.set("if_result", "");
+    iir.returnVariable = ctx.setTmp("if_result");
 
     return iir;
   }
@@ -285,31 +287,49 @@ class IfIR : IR {
   }
 }
 
-class LetIR : IR {
+LetXIR letXIRFromAST(Value value, Context ctx, bool letStar) {
+  auto defs = car(value);
+  auto block = cdr(value);
+
+  auto lir = new LetIR;
+  foreach (def; listToVector(defs)) {
+    auto key = valueToString(car(def));
+    auto val = car(cdr(def));
+
+    bool shadowing = ctx.contains(key);
+
+    if (letStar) {
+      ctx.set(key, "", false);
+    }
+    lir.assignments ~= new AssignmentIR(key, IR.fromAST(val, ctx.dup()), shadowing);
+    if (!letStar) {
+      ctx.set(key, "", false);
+    }
+  }
+
+  auto newCtx = ctx.dup();
+  lir.block = BeginIR.fromAST(block, newCtx);
+
+  return lir;
+}
+
+class LetXIR : IR {
   AssignmentIR[] assignments;
   BeginIR block;
 
-  static LetIR fromAST(Value value, Context ctx) {
-    auto defs = car(value);
-    auto block = cdr(value);
-
-    auto lir = new LetIR;
-    foreach (def; listToVector(defs)) {
-      auto key = valueToString(car(def));
-      auto val = car(cdr(def));
-
-      bool shadowing = ctx.contains(key);
-      lir.assignments ~= new AssignmentIR(key, IR.fromAST(val, ctx.dup()), shadowing);
-      ctx.set(key, "", false);
-    }
-
-    auto newCtx = ctx.dup();
-    lir.block = BeginIR.fromAST(block, newCtx);
-
-    return lir;
-  }
-
   override IR getReturnIR() {
     return block.getReturnIR();
+  }
+}
+
+class LetIR : LetXIR {
+  static LetXIR fromAST(Value value, Context ctx) {
+    return letXIRFromAST(value, ctx, false);
+  }
+}
+
+class LetStarIR : LetXIR {
+  static LetXIR fromAST(Value value, Context ctx) {
+    return letXIRFromAST(value, ctx, true);
   }
 }

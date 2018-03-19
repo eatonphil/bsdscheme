@@ -12,6 +12,14 @@ void cgWarning(string warning) {
   writeln(format("[CG][WARNING]: %s", warning));
 }
 
+bool nonLiteral(IR arg) {
+  return cast(VariableIR)arg is null &&
+    cast(LiteralIR!string)arg is null &&
+    cast(LiteralIR!long)arg is null &&
+    cast(LiteralIR!bool)arg is null &&
+    cast(LiteralIR!char)arg is null;
+}
+
 class CG {
   static string fromIR(IR ir, bool topLevel) {
     if (auto sir = cast(LiteralIR!string)ir) {
@@ -38,7 +46,7 @@ class CG {
       return VariableCG.fromIR(vir);
     } else if (auto air = cast(AssignmentIR)ir) {
       return AssignmentCG.fromIR(air);
-    } else if (auto lir = cast(LetIR)ir) {
+    } else if (auto lir = cast(LetXIR)ir) {
       return LetCG.fromIR(lir);
     } else {
       cgError(format("Invalid IR."));
@@ -53,11 +61,7 @@ class FuncallCG : CG {
     string[] args;
     
     foreach (arg; fir.arguments) {
-      if (cast(VariableIR)arg is null &&
-          cast(LiteralIR!string)arg is null &&
-          cast(LiteralIR!long)arg is null &&
-          cast(LiteralIR!bool)arg is null &&
-          cast(LiteralIR!char)arg is null) {
+      if (nonLiteral(arg)) {
         argInitializers ~= CG.fromIR(arg, false);
       }
       args ~= CG.fromIR(arg.getReturnIR(), false);
@@ -123,7 +127,7 @@ class DefineCG : CG {
 
 class IfCG : CG {
   static string fromIR(IfIR iir) {
-    string init = CG.fromIR(iir.test, false);
+    string init = nonLiteral(iir.test) ? CG.fromIR(iir.test, false) : "";
 
     return format("%s;\n\tValue %s;\n\tif (valueToBool(%s)) {\n\t%s;\n\t%s = %s;\n\t} else {\n\t%s;\n\t%s = %s;\n\t}",
                   init,
@@ -146,15 +150,20 @@ class VariableCG : CG {
 
 class AssignmentCG : CG {
   static string fromIR(AssignmentIR air) {
-    return format("%s%s = %s",
+    string init = nonLiteral(air.value) ?
+      format("%s;\n\t", CG.fromIR(air.value, false)) :
+      "";
+
+    return format("%s%s%s = %s",
+                  init,
                   air.shadowing ? "" : "Value ",
                   air.assignTo,
-                  CG.fromIR(air.value, false));
+                  CG.fromIR(air.value.getReturnIR(), false));
   }
 }
 
 class LetCG : CG {
-  static string fromIR(LetIR lir) {
+  static string fromIR(LetXIR lir) {
     string[] assignments;
 
     foreach (asn; lir.assignments) {
