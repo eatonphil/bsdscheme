@@ -19,7 +19,7 @@ void generate(string outFile, string prologue, IR ir, string epilogue) {
   auto f = File(outFile, "w");
 
   f.write(prologue);
-  f.write(CG.fromIR(ir, false));
+  f.write(CG.fromIR(ir));
   f.write(epilogue);
 }
 
@@ -43,7 +43,6 @@ int main(string[] args) {
 
   auto ctx = Context.getDefault();
   IR ir = IR.fromAST(withBegin(value), ctx);
-  IR2 ir2 = IR2.fromIR(ir);
 
   string[] dImports = ["std.stdio"];
   string[] localDImports = ["lex", "common", "parse", "utility", "value", "buffer"];

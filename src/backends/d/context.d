@@ -1,3 +1,6 @@
+import std.algorithm;
+import std.format;
+
 class Context {
   string[string] ctx;
   string[] specialForms;
@@ -5,6 +8,10 @@ class Context {
   this(string[string] initCtx, string[] initSpecialForms) {
     ctx = initCtx;
     specialForms = initSpecialForms;
+  }
+
+  
+  this() {
   }
 
   string set(string key, string value, bool requireUnique) {
@@ -38,7 +45,7 @@ class Context {
     }
   }
 
-  Context* dup() {
+  Context dup() {
     auto d = new Context;
     d.ctx = this.ctx.dup();
     d.specialForms = this.specialForms;

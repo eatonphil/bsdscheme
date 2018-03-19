@@ -2,19 +2,20 @@ import std.format;
 import std.stdio;
 
 import value;
+import utility;
 
 import context;
 
-void compileError(string error) {
-  throw new Exception(format("[ERROR]: %s", error));
+void irError(string error) {
+  throw new Exception(format("[IR][ERROR]: %s", error));
 }
 
-void compileWarning(string warning) {
-  writeln(format("[WARNING]: %s", warning));
+void irWarning(string warning) {
+  writeln(format("[IR][WARNING]: %s", warning));
 }
 
 class IR {
-  static IR fromAST(Value value, Context* ctx) {
+  static IR fromAST(Value value, Context ctx) {
     switch (tagOfValue(value)) {
     case ValueTag.Symbol:
       return VariableIR.fromAST(value, ctx);
@@ -35,7 +36,7 @@ class IR {
     case ValueTag.List:
       return FuncallIR.fromAST(value, ctx);
     default:
-      compileError(format("Bad value: %s", tagOfValue(value)));
+      irError(format("Bad value: %s", tagOfValue(value)));
       assert(0);
     }
   }
@@ -46,7 +47,7 @@ class IR {
 }
 
 class NilIR : IR {
-  static NilIR* nir;
+  static NilIR nir;
 
   static NilIR get() {
     if (NilIR.nir is null) {
@@ -97,10 +98,10 @@ class VariableIR : IR {
     name = initName;
   }
 
-  static VariableIR fromAST(Value value, Context* ctx) {
+  static VariableIR fromAST(Value value, Context ctx) {
     string symbol = valueToSymbol(value);
     if (!ctx.contains(symbol)) {
-      compileError("Undefined symbol: %s", symbol);
+      irError(format("Undefined symbol: %s", symbol));
       assert(0);
     }
 
@@ -113,12 +114,13 @@ class FuncallIR : IR {
   string returnVariable;
   IR[] arguments;
 
-  this(string initName, IR[] initArguments) {
+  this(string initName, IR[] initArguments, string initReturnVariable) {
     name = initName;
     arguments = initArguments;
+    returnVariable = initReturnVariable;
   }
 
-  static IR fromAST(Value value, Context* ctx) {
+  static IR fromAST(Value value, Context ctx) {
     auto v = valueToList(value);
     string symbol = valueToString(v[0]);
 
@@ -134,7 +136,7 @@ class FuncallIR : IR {
     }
 
     if (!ctx.contains(symbol)) {
-      compileError(format("Call to unknown function: %s", symbol));
+      irError(format("Call to unknown function: %s", symbol));
       assert(0);
     }
 
@@ -149,7 +151,7 @@ class FuncallIR : IR {
     return fir;
   }
 
-  IR getReturnIR() {
+  override IR getReturnIR() {
     return new VariableIR(returnVariable);
   }
 }
@@ -169,7 +171,7 @@ class AssignmentIR : IR {
     this(assignTo, value, false);
   }
 
-  IR getReturnIR() {
+  override IR getReturnIR() {
     return new VariableIR(assignTo);
   }
 }
@@ -178,10 +180,10 @@ const string ARGUMENTS = "arguments";
 
 class DefineFunctionIR : IR {
   string name;
-  
+  IR[] parameters;
   BeginIR block;
 
-  static IR fromAST(Value definition, Context* ctx) {
+  static IR fromAST(Value definition, Value block, Context ctx) {
     auto dir = new DefineFunctionIR;
 
     auto functionName = car(definition);
@@ -192,55 +194,53 @@ class DefineFunctionIR : IR {
     string[] parameters;
 
     foreach (i, parameter; listToVector(arg2)) {
-      auto vir = new FuncallIR("nth", [new VariableIR(ARGUMENTS), new IntegerIR(i)]);
-      dir.expressions ~= new AssignmentIR(valueToString(parameter), vir);
+      auto args = [new VariableIR(ARGUMENTS), new IntegerIR(i)];
+      dir.parameters ~= new FuncallIR("nth", args, valueToString(parameter));
     }
 
     if (ctx.contains(symbol)) {
-      compileWarning(format("Shadowing assignment: %s", symbol));
+      irWarning(format("Shadowing assignment: %s", symbol));
     }
     ctx.set(symbol, format("BSDScheme_%s", symbol), false);
     auto newCtx = ctx.dup();
-    dir.block = BeginIR.fromAST(cdr(value), newCtx);
+    dir.block = BeginIR.fromAST(block, newCtx);
 
     return dir;
   }
 
-  IR getReturnIR() {
+  override IR getReturnIR() {
     return block.getReturnIR();
   }
 }
 
 class DefineIR : IR {
-  string name;
   IR value;
 
-  static IR fromAST(Value value, Context* ctx) {
+  static IR fromAST(Value value, Context ctx) {
     auto dir = new DefineIR;
 
     auto definition = car(value);
 
     // (define (fn ...) ...)
     if (valueIsList(definition)) {
-      return DefineFunctionIR(definition, ctx);
+      return DefineFunctionIR.fromAST(definition, cdr(value), ctx);
     }
 
     if (!valueIsSymbol(definition)) {
-      compileError("Unexpected define structure");
+      irError("Unexpected define structure");
       assert(0);
     }
 
     string symbol = valueToSymbol(definition);
-    dir.name = symbol;
 
     auto arg2 = car(cdr(value));
     auto ir = IR.fromAST(arg2, ctx);
 
     if (ctx.contains(symbol)) {
-      compileWarning(format("Shadowing assignment: %s", symbol));
+      irWarning(format("Shadowing assignment: %s", symbol));
     }
     ctx.set(symbol, symbol, false);
-    dir.value = new AssignmentIR(symbol, ir, shadowing);
+    dir.value = new AssignmentIR(symbol, ir);
 
     return dir;
   }
@@ -250,7 +250,7 @@ class BeginIR : IR {
   IR[] expressions;
   string returnVariable;
 
-  static BeginIR fromAST(Value value, Context* ctx) {
+  static BeginIR fromAST(Value value, Context ctx) {
     auto bir = new BeginIR;
 
     auto vector = listToVector(value);
@@ -263,7 +263,7 @@ class BeginIR : IR {
     return bir;
   }
 
-  IR getReturnIR() {
+  override IR getReturnIR() {
     auto length = this.expressions.length;
     if (!length) {
       return NilIR.get();
@@ -281,7 +281,7 @@ class IfIR : IR {
   IR ifElse;
   string returnVariable;
 
-  static IfIR fromAST(Value value, Context* ctx) {
+  static IfIR fromAST(Value value, Context ctx) {
     auto iir = new IfIR;
 
     auto vector = listToVector(value);
@@ -299,7 +299,7 @@ class IfIR : IR {
     return iir;
   }
 
-  IR getReturnIR() {
+  override IR getReturnIR() {
     return new VariableIR(returnVariable);
   }
 }
