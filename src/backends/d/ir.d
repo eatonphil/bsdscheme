@@ -107,6 +107,8 @@ class FuncallIR : IR {
       return BeginIR.fromAST(v[1], ctx);
     case "if":
       return IfIR.fromAST(v[1], ctx);
+    case "let":
+      return LetIR.fromAST(v[1], ctx);
     default:
       break;
     }
@@ -122,7 +124,7 @@ class FuncallIR : IR {
     string returnVariable = ctx.set(format("%s_result", fn), "");
     auto fir = new FuncallIR(fn, [], returnVariable);
 
-    foreach(arg; listToVector(v[1])) {
+    foreach (arg; listToVector(v[1])) {
       fir.arguments ~= IR.fromAST(arg, ctx);
     }
 
@@ -280,5 +282,34 @@ class IfIR : IR {
 
   override IR getReturnIR() {
     return new VariableIR(returnVariable);
+  }
+}
+
+class LetIR : IR {
+  AssignmentIR[] assignments;
+  BeginIR block;
+
+  static LetIR fromAST(Value value, Context ctx) {
+    auto defs = car(value);
+    auto block = cdr(value);
+
+    auto lir = new LetIR;
+    foreach (def; listToVector(defs)) {
+      auto key = valueToString(car(def));
+      auto val = car(cdr(def));
+
+      bool shadowing = ctx.contains(key);
+      lir.assignments ~= new AssignmentIR(key, IR.fromAST(val, ctx.dup()), shadowing);
+      ctx.set(key, "", false);
+    }
+
+    auto newCtx = ctx.dup();
+    lir.block = BeginIR.fromAST(block, newCtx);
+
+    return lir;
+  }
+
+  override IR getReturnIR() {
+    return block.getReturnIR();
   }
 }

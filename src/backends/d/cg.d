@@ -38,6 +38,8 @@ class CG {
       return VariableCG.fromIR(vir);
     } else if (auto air = cast(AssignmentIR)ir) {
       return AssignmentCG.fromIR(air);
+    } else if (auto lir = cast(LetIR)ir) {
+      return LetCG.fromIR(lir);
     } else {
       cgError(format("Invalid IR."));
       assert(0);
@@ -50,8 +52,12 @@ class FuncallCG : CG {
     string[] argInitializers;
     string[] args;
     
-    foreach(arg; fir.arguments) {
-      if (cast(FuncallIR)arg) {
+    foreach (arg; fir.arguments) {
+      if (cast(VariableIR)arg is null &&
+          cast(LiteralIR!string)arg is null &&
+          cast(LiteralIR!long)arg is null &&
+          cast(LiteralIR!bool)arg is null &&
+          cast(LiteralIR!char)arg is null) {
         argInitializers ~= CG.fromIR(arg, false);
       }
       args ~= CG.fromIR(arg.getReturnIR(), false);
@@ -144,5 +150,19 @@ class AssignmentCG : CG {
                   air.shadowing ? "" : "Value ",
                   air.assignTo,
                   CG.fromIR(air.value, false));
+  }
+}
+
+class LetCG : CG {
+  static string fromIR(LetIR lir) {
+    string[] assignments;
+
+    foreach (asn; lir.assignments) {
+      assignments ~= CG.fromIR(asn, false);
+    }
+
+    return format("%s;\n\t%s",
+                  assignments.join(";\n\t"),
+                  BeginCG.fromIR(lir.block, false));
   }
 }

@@ -10,9 +10,7 @@ class Context {
     specialForms = initSpecialForms;
   }
 
-  
-  this() {
-  }
+  this() {}
 
   string set(string key, string value, bool requireUnique) {
     if (requireUnique) {
