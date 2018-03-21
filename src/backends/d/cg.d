@@ -48,6 +48,10 @@ class CG {
       return AssignmentCG.fromIR(air);
     } else if (auto lir = cast(LetXIR)ir) {
       return LetCG.fromIR(lir);
+    } else if (auto mir = cast(MapIR)ir) {
+      return MapCG.fromIR(mir);
+    } else if (auto lir = cast(ListIR)ir) {
+      return ListCG.fromIR(lir);
     } else {
       cgError(format("Invalid IR."));
       assert(0);
@@ -173,5 +177,36 @@ class LetCG : CG {
     return format("%s;\n\t%s",
                   assignments.join(";\n\t"),
                   BeginCG.fromIR(lir.block, false));
+  }
+}
+
+class MapCG : CG {
+  static string fromIR(MapIR mir) {
+    string init = nonLiteral(mir.list) ? CG.fromIR(mir.list, false) : "";
+
+    return format("%s\n\tValue[] %s;\n\tforeach (item; listToVector(%s)) {\n\t%s ~= %s(item, null);\t\n}\n\tValue %s = vectorToList",
+                  init,
+                  mir.tmp,
+                  CG.fromIR(mir.list.getReturnIR(), false),
+                  mir.tmp,
+                  CG.fromIR(mir.fn, false),
+                  mir.returnVariable);
+  }
+}
+
+class ListCG : CG {
+  static string fromIR(ListIR lir) {
+    string[] inits;
+    string[] returns;
+
+    foreach (e; lir.list) {
+      inits ~= CG.fromIR(e, false);
+      returns ~= CG.fromIR(e.getReturnIR(), false);
+    }
+
+    return format("%s;\n\tValue %s = vectorToList[%s]",
+                  inits.join(";\n\t"),
+                  lir.returnVariable,
+                  returns.join(", "));
   }
 }
