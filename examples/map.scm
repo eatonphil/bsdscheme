@@ -2,4 +2,5 @@
   (+ a 1))
 
 (define (main)
-  (map pp (list 1 2 3)))
+  (display (for-each pp (list 1 2 3)))
+  (newline))

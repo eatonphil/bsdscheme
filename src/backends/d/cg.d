@@ -88,11 +88,13 @@ class DefineFunctionCG : CG {
   static string fromIR(DefineFunctionIR fir) {
     
 
-    string functionHeader = format("Value %s(Value %s, void** ctx) {", fir.name, ARGUMENTS);
+    string functionHeader = format("Value %s(Value %s, void** ctx) {\n\t", fir.name, ARGUMENTS);
     string functionFooter = format("}\n");
 
 
-    string block = format("\n\tValue[] %s = listToVector(%s);\n\t", fir.tmp, ARGUMENTS);
+    string block = fir.parameters.length ?
+      format("Value[] %s = listToVector(%s);\n\t", fir.tmp, ARGUMENTS) :
+      "";
     foreach (i, parameter; fir.parameters) {
       block ~= format("Value %s = %s[%d];\n\t", parameter, fir.tmp, i);
     }
@@ -133,7 +135,7 @@ class IfCG : CG {
   static string fromIR(IfIR iir) {
     string init = nonLiteral(iir.test) ? CG.fromIR(iir.test, false) : "";
 
-    return format("%s;\n\tValue %s;\n\tif (valueToBool(%s)) {\n\t%s;\n\t%s = %s;\n\t} else {\n\t%s;\n\t%s = %s;\n\t}",
+    return format("%s;\n\tValue %s;\n\tif (truthy(%s)) {\n\t%s;\n\t%s = %s;\n\t} else {\n\t%s;\n\t%s = %s;\n\t}",
                   init,
                   iir.returnVariable,
                   CG.fromIR(iir.test.getReturnIR(), false),
@@ -183,14 +185,15 @@ class LetCG : CG {
 class MapCG : CG {
   static string fromIR(MapIR mir) {
     string init = nonLiteral(mir.list) ? CG.fromIR(mir.list, false) : "";
-
-    return format("%s\n\tValue[] %s;\n\tforeach (item; listToVector(%s)) {\n\t%s ~= %s(item, null);\t\n}\n\tValue %s = vectorToList",
-                  init,
-                  mir.tmp,
-                  CG.fromIR(mir.list.getReturnIR(), false),
-                  mir.tmp,
-                  CG.fromIR(mir.fn, false),
-                  mir.returnVariable);
+    string tmp = format("Value[] %s", mir.tmp);
+    string foreachHeaderBody =
+      format("foreach (item; listToVector(%s)) {\n\t",
+             CG.fromIR(mir.list.getReturnIR(), false)) ~
+      format("%s ~= %s(makeListValue(item, nilValue), null)",
+             mir.tmp, CG.fromIR(mir.fn, false));
+    string foreachFooter = format("}\n\tValue %s = vectorToList(%s)",
+                                  mir.returnVariable, mir.tmp);
+    return [init, tmp, foreachHeaderBody, foreachFooter].join(";\n\t");
   }
 }
 
@@ -200,12 +203,16 @@ class ListCG : CG {
     string[] returns;
 
     foreach (e; lir.list) {
-      inits ~= CG.fromIR(e, false);
+      if (nonLiteral(e)) {
+        inits ~= CG.fromIR(e, false);
+      }
       returns ~= CG.fromIR(e.getReturnIR(), false);
     }
 
-    return format("%s;\n\tValue %s = vectorToList[%s]",
-                  inits.join(";\n\t"),
+    string init = inits.join(";\n\t") ~ (inits.length ? ";\n\t" : "");
+
+    return format("%sValue %s = vectorToList([%s])",
+                  init,
                   lir.returnVariable,
                   returns.join(", "));
   }

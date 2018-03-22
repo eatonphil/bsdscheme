@@ -98,39 +98,47 @@ class FuncallIR : IR {
 
   static IR fromAST(Value value, Context ctx) {
     auto v = valueToList(value);
-    string symbol = valueToString(v[0]);
 
-    switch (symbol) {
-    case "define":
-      return DefineIR.fromAST(v[1], ctx);
-    case "begin":
-      return BeginIR.fromAST(v[1], ctx);
-    case "if":
-      return IfIR.fromAST(v[1], ctx);
-    case "let":
-      return LetIR.fromAST(v[1], ctx);
-    case "let*":
-      return LetStarIR.fromAST(v[1], ctx);
-    case "set!":
-      return SetIR.fromAST(v[1], ctx);
-    case "map":
-      return MapIR.fromAST(v[1], ctx);
-    case "apply":
-      return ApplyIR.fromAST(v[1], ctx);
-    case "for-each":
-      return ForeachIR.fromAST(v[1], ctx);
-    case "list":
-      return ListIR.fromAST(v[1], ctx);
-    default:
-      break;
+    string fn;
+    if (valueIsString(v[0])) {
+      string symbol = valueToString(v[0]);
+
+      switch (symbol) {
+      case "define":
+        return DefineIR.fromAST(v[1], ctx);
+      case "begin":
+        return BeginIR.fromAST(v[1], ctx);
+      case "if":
+        return IfIR.fromAST(v[1], ctx);
+      case "let":
+        return LetIR.fromAST(v[1], ctx);
+      case "let*":
+        return LetStarIR.fromAST(v[1], ctx);
+      case "set!":
+        return SetIR.fromAST(v[1], ctx);
+      case "map":
+        return MapIR.fromAST(v[1], ctx);
+      case "apply":
+        return ApplyIR.fromAST(v[1], ctx);
+      case "for-each":
+        return ForeachIR.fromAST(v[1], ctx);
+      case "list":
+        return ListIR.fromAST(v[1], ctx);
+      case "lambda":
+        return LambdaIR.fromAST(v[1], ctx);
+      default:
+        break;
+      }
+
+      if (!ctx.contains(symbol)) {
+        irError(format("Call to unknown function: %s", symbol));
+        assert(0);
+      }
+
+      fn = ctx.get(symbol);
+    } else if (valueIsList(v[0])) {
+      // Handle list value.
     }
-
-    if (!ctx.contains(symbol)) {
-      irError(format("Call to unknown function: %s", symbol));
-      assert(0);
-    }
-
-    auto fn = ctx.get(symbol);
 
     string returnVariable = ctx.setTmp(format("%s_result", fn));
     auto fir = new FuncallIR(fn, [], returnVariable);
@@ -184,7 +192,7 @@ class DefineFunctionIR : IR {
     if (ctx.contains(symbol)) {
       irWarning(format("Shadowing assignment: %s", symbol));
     }
-    dir.name = format("BSDScheme_%s", symbol);
+    dir.name = symbol == "main" ? "BSDScheme_main" : symbol;
     ctx.set(symbol, dir.name, false);
 
     auto arg2 = cdr(definition);
@@ -381,7 +389,14 @@ class MapIR : IR {
 
 class ForeachIR : MapIR {
   static ForeachIR fromAST(Value value, Context ctx) {
-    return cast(ForeachIR)MapIR.fromAST(value, ctx);
+    auto fir = new ForeachIR;
+    auto mir = MapIR.fromAST(value, ctx);
+    fir.fn = mir.fn;
+    fir.list = mir.list;
+    fir.tmp = mir.tmp;
+    fir.returnVariable = mir.returnVariable;
+    delete mir;
+    return fir;
   }
 
   override IR getReturnIR() {
@@ -405,7 +420,7 @@ class ListIR : IR {
   static IR fromAST(Value value, Context ctx) {
     auto lir = new ListIR;
     foreach (el; listToVector(value)) {
-      lir.list ~= IR.fromAST(value, ctx);
+      lir.list ~= IR.fromAST(el, ctx);
     }
     lir.returnVariable = ctx.setTmp("list");
     return lir;
@@ -413,5 +428,12 @@ class ListIR : IR {
 
   override IR getReturnIR() {
     return new VariableIR(returnVariable);
+  }
+}
+
+class LambdaIR : IR {
+  static IR fromAST(Value value, Context ctx) {
+    auto lambdaName = makeStringValue(ctx.setTmp("lambda"));
+    return DefineIR.fromAST(makeListValue(makeListValue(lambdaName, car(value)), cdr(value)), ctx);
   }
 }
