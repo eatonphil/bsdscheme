@@ -1,6 +1,7 @@
 import std.array;
 import std.format;
 import std.stdio;
+import std.string;
 
 import ir;
 
@@ -52,6 +53,8 @@ class CG {
       return MapCG.fromIR(mir);
     } else if (auto lir = cast(ListIR)ir) {
       return ListCG.fromIR(lir);
+    } else if (auto qir = cast(QuoteIR)ir) {
+      return QuoteCG.fromIR(qir);
     } else {
       cgError(format("Invalid IR."));
       assert(0);
@@ -214,5 +217,12 @@ class ListCG : CG {
                   init,
                   lir.returnVariable,
                   returns.join(", "));
+  }
+}
+
+class QuoteCG : CG {
+  static string fromIR(QuoteIR qir) {
+    auto safeSerialized = qir.serialized.translate(['"': "\\\""]);
+    return format("Value %s = car(read(\"%s\".dup))", qir.tmp, safeSerialized);
   }
 }

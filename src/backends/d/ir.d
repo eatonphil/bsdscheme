@@ -133,6 +133,8 @@ class FuncallIR : IR {
         return ListIR.fromAST(v[1], ctx);
       case "lambda":
         return LambdaIR.fromAST(v[1], ctx);
+      case "quote":
+        return QuoteIR.fromAST(v[1], ctx);
       default:
         break;
       }
@@ -455,5 +457,21 @@ class LambdaIR : IR {
                                              car(value)),
                                              cdr(value));
     return DefineIR.fromAST(defineArgsTransform, ctx);
+  }
+}
+
+class QuoteIR : IR {
+  string tmp;
+  string serialized;
+
+  static IR fromAST(Value value, Context ctx) {
+    auto qir = new QuoteIR;
+    qir.tmp = ctx.setTmp("quoted");
+    qir.serialized = formatValue(car(value));
+    return qir;
+  }
+
+  override IR getReturnIR() {
+    return new VariableIR(tmp);
   }
 }

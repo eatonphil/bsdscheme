@@ -2,5 +2,5 @@
   (+ a 1))
 
 (define (main)
-  (display (map pp (list 1 2 3)))
+  (display (map pp '(1 2 3)))
   (newline))
