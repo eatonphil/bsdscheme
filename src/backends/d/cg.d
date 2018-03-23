@@ -63,6 +63,8 @@ class FuncallCG : CG {
   static string fromIR(FuncallIR fir) {
     string[] argInitializers;
     string[] args;
+
+    string fnInit = fir.init is null ? "" : format("%s;\n\t", CG.fromIR(fir.init, false));
     
     foreach (arg; fir.arguments) {
       if (nonLiteral(arg)) {
@@ -76,7 +78,8 @@ class FuncallCG : CG {
       initializers ~= ";\n\t";
     }
 
-    return format("%s\n\tValue %s = %s(vectorToList([%s]), null)",
+    return format("%s%s\n\tValue %s = %s(vectorToList([%s]), null)",
+                  fnInit,
                   initializers,
                   fir.returnVariable,
                   fir.name,
@@ -86,11 +89,8 @@ class FuncallCG : CG {
 
 class DefineFunctionCG : CG {
   static string fromIR(DefineFunctionIR fir) {
-    
-
     string functionHeader = format("Value %s(Value %s, void** ctx) {\n\t", fir.name, ARGUMENTS);
     string functionFooter = format("}\n");
-
 
     string block = fir.parameters.length ?
       format("Value[] %s = listToVector(%s);\n\t", fir.tmp, ARGUMENTS) :
@@ -100,8 +100,7 @@ class DefineFunctionCG : CG {
     }
 
     block ~= BeginCG.fromIR(fir.block, false);
-
-    block ~= format(";\n\treturn %s;\n", CG.fromIR(fir.getReturnIR(), false));
+    block ~= format(";\n\treturn %s;\n", CG.fromIR(fir.block.getReturnIR(), false));
 
     return format("%s%s%s", functionHeader, block, functionFooter);
   }

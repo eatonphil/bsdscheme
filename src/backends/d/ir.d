@@ -89,19 +89,26 @@ class FuncallIR : IR {
   string name;
   string returnVariable;
   IR[] arguments;
+  IR init;
 
-  this(string initName, IR[] initArguments, string initReturnVariable) {
+  this(string initName, IR[] initArguments, string initReturnVariable, IR initInit) {
     name = initName;
     arguments = initArguments;
     returnVariable = initReturnVariable;
+    init = initInit;
+  }
+
+  this(string initName, IR[] initArguments, string initReturnVariable) {
+    this(initName, initArguments, initReturnVariable, NilIR.get());
   }
 
   static IR fromAST(Value value, Context ctx) {
+    IR init;
     auto v = valueToList(value);
 
     string fn;
-    if (valueIsString(v[0])) {
-      string symbol = valueToString(v[0]);
+    if (valueIsSymbol(v[0])) {
+      string symbol = valueToSymbol(v[0]);
 
       switch (symbol) {
       case "define":
@@ -137,11 +144,17 @@ class FuncallIR : IR {
 
       fn = ctx.get(symbol);
     } else if (valueIsList(v[0])) {
-      // Handle list value.
+      init = IR.fromAST(v[0], ctx);
+      auto returnIR = init.getReturnIR();
+      if (auto vir = cast(VariableIR)returnIR) {
+        fn = vir.name;
+      } else {
+        irError(format("Invalid funcall near: %s", formatValue(value)));
+      }      
     }
 
     string returnVariable = ctx.setTmp(format("%s_result", fn));
-    auto fir = new FuncallIR(fn, [], returnVariable);
+    auto fir = new FuncallIR(fn, [], returnVariable, init);
 
     foreach (arg; listToVector(v[1])) {
       fir.arguments ~= IR.fromAST(arg, ctx);
@@ -214,7 +227,7 @@ class DefineFunctionIR : IR {
   }
 
   override IR getReturnIR() {
-    return block.getReturnIR();
+    return new VariableIR(name);
   }
 }
 
@@ -248,6 +261,10 @@ class DefineIR : IR {
     dir.value = new AssignmentIR(symbol, ir);
 
     return dir;
+  }
+
+  override IR getReturnIR() {
+    return value.getReturnIR();
   }
 }
 
@@ -434,6 +451,9 @@ class ListIR : IR {
 class LambdaIR : IR {
   static IR fromAST(Value value, Context ctx) {
     auto lambdaName = makeStringValue(ctx.setTmp("lambda"));
-    return DefineIR.fromAST(makeListValue(makeListValue(lambdaName, car(value)), cdr(value)), ctx);
+    auto defineArgsTransform = makeListValue(makeListValue(lambdaName,
+                                             car(value)),
+                                             cdr(value));
+    return DefineIR.fromAST(defineArgsTransform, ctx);
   }
 }
