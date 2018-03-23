@@ -1,6 +1,7 @@
 import std.array;
 import std.format;
 import std.stdio;
+import std.string;
 
 import ir;
 
@@ -48,6 +49,12 @@ class CG {
       return AssignmentCG.fromIR(air);
     } else if (auto lir = cast(LetXIR)ir) {
       return LetCG.fromIR(lir);
+    } else if (auto mir = cast(MapIR)ir) {
+      return MapCG.fromIR(mir);
+    } else if (auto lir = cast(ListIR)ir) {
+      return ListCG.fromIR(lir);
+    } else if (auto qir = cast(QuoteIR)ir) {
+      return QuoteCG.fromIR(qir);
     } else {
       cgError(format("Invalid IR."));
       assert(0);
@@ -59,6 +66,8 @@ class FuncallCG : CG {
   static string fromIR(FuncallIR fir) {
     string[] argInitializers;
     string[] args;
+
+    string fnInit = fir.init is null ? "" : format("%s;\n\t", CG.fromIR(fir.init, false));
     
     foreach (arg; fir.arguments) {
       if (nonLiteral(arg)) {
@@ -72,7 +81,8 @@ class FuncallCG : CG {
       initializers ~= ";\n\t";
     }
 
-    return format("%s\n\tValue %s = %s(vectorToList([%s]), null)",
+    return format("%s%s\n\tValue %s = %s(vectorToList([%s]), null)",
+                  fnInit,
                   initializers,
                   fir.returnVariable,
                   fir.name,
@@ -82,20 +92,18 @@ class FuncallCG : CG {
 
 class DefineFunctionCG : CG {
   static string fromIR(DefineFunctionIR fir) {
-    
-
-    string functionHeader = format("Value %s(Value %s, void** ctx) {", fir.name, ARGUMENTS);
+    string functionHeader = format("Value %s(Value %s, void** ctx) {\n\t", fir.name, ARGUMENTS);
     string functionFooter = format("}\n");
 
-
-    string block = format("\n\tValue[] %s = listToVector(%s);\n\t", fir.tmp, ARGUMENTS);
+    string block = fir.parameters.length ?
+      format("Value[] %s = listToVector(%s);\n\t", fir.tmp, ARGUMENTS) :
+      "";
     foreach (i, parameter; fir.parameters) {
       block ~= format("Value %s = %s[%d];\n\t", parameter, fir.tmp, i);
     }
 
     block ~= BeginCG.fromIR(fir.block, false);
-
-    block ~= format(";\n\treturn %s;\n", CG.fromIR(fir.getReturnIR(), false));
+    block ~= format(";\n\treturn %s;\n", CG.fromIR(fir.block.getReturnIR(), false));
 
     return format("%s%s%s", functionHeader, block, functionFooter);
   }
@@ -129,7 +137,7 @@ class IfCG : CG {
   static string fromIR(IfIR iir) {
     string init = nonLiteral(iir.test) ? CG.fromIR(iir.test, false) : "";
 
-    return format("%s;\n\tValue %s;\n\tif (valueToBool(%s)) {\n\t%s;\n\t%s = %s;\n\t} else {\n\t%s;\n\t%s = %s;\n\t}",
+    return format("%s;\n\tValue %s;\n\tif (truthy(%s)) {\n\t%s;\n\t%s = %s;\n\t} else {\n\t%s;\n\t%s = %s;\n\t}",
                   init,
                   iir.returnVariable,
                   CG.fromIR(iir.test.getReturnIR(), false),
@@ -173,5 +181,48 @@ class LetCG : CG {
     return format("%s;\n\t%s",
                   assignments.join(";\n\t"),
                   BeginCG.fromIR(lir.block, false));
+  }
+}
+
+class MapCG : CG {
+  static string fromIR(MapIR mir) {
+    string init = nonLiteral(mir.list) ? CG.fromIR(mir.list, false) : "";
+    string tmp = format("Value[] %s", mir.tmp);
+    string foreachHeaderBody =
+      format("foreach (item; listToVector(%s)) {\n\t",
+             CG.fromIR(mir.list.getReturnIR(), false)) ~
+      format("%s ~= %s(makeListValue(item, nilValue), null)",
+             mir.tmp, CG.fromIR(mir.fn, false));
+    string foreachFooter = format("}\n\tValue %s = vectorToList(%s)",
+                                  mir.returnVariable, mir.tmp);
+    return [init, tmp, foreachHeaderBody, foreachFooter].join(";\n\t");
+  }
+}
+
+class ListCG : CG {
+  static string fromIR(ListIR lir) {
+    string[] inits;
+    string[] returns;
+
+    foreach (e; lir.list) {
+      if (nonLiteral(e)) {
+        inits ~= CG.fromIR(e, false);
+      }
+      returns ~= CG.fromIR(e.getReturnIR(), false);
+    }
+
+    string init = inits.join(";\n\t") ~ (inits.length ? ";\n\t" : "");
+
+    return format("%sValue %s = vectorToList([%s])",
+                  init,
+                  lir.returnVariable,
+                  returns.join(", "));
+  }
+}
+
+class QuoteCG : CG {
+  static string fromIR(QuoteIR qir) {
+    auto safeSerialized = qir.serialized.translate(['"': "\\\""]);
+    return format("Value %s = car(read(\"%s\".dup))", qir.tmp, safeSerialized);
   }
 }

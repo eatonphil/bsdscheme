@@ -89,43 +89,74 @@ class FuncallIR : IR {
   string name;
   string returnVariable;
   IR[] arguments;
+  IR init;
 
-  this(string initName, IR[] initArguments, string initReturnVariable) {
+  this(string initName, IR[] initArguments, string initReturnVariable, IR initInit) {
     name = initName;
     arguments = initArguments;
     returnVariable = initReturnVariable;
+    init = initInit;
+  }
+
+  this(string initName, IR[] initArguments, string initReturnVariable) {
+    this(initName, initArguments, initReturnVariable, NilIR.get());
   }
 
   static IR fromAST(Value value, Context ctx) {
+    IR init;
     auto v = valueToList(value);
-    string symbol = valueToString(v[0]);
 
-    switch (symbol) {
-    case "define":
-      return DefineIR.fromAST(v[1], ctx);
-    case "begin":
-      return BeginIR.fromAST(v[1], ctx);
-    case "if":
-      return IfIR.fromAST(v[1], ctx);
-    case "let":
-      return LetIR.fromAST(v[1], ctx);
-    case "let*":
-      return LetStarIR.fromAST(v[1], ctx);
-    case "set!":
-      return SetIR.fromAST(v[1], ctx);
-    default:
-      break;
+    string fn;
+    if (valueIsSymbol(v[0])) {
+      string symbol = valueToSymbol(v[0]);
+
+      switch (symbol) {
+      case "define":
+        return DefineIR.fromAST(v[1], ctx);
+      case "begin":
+        return BeginIR.fromAST(v[1], ctx);
+      case "if":
+        return IfIR.fromAST(v[1], ctx);
+      case "let":
+        return LetIR.fromAST(v[1], ctx);
+      case "let*":
+        return LetStarIR.fromAST(v[1], ctx);
+      case "set!":
+        return SetIR.fromAST(v[1], ctx);
+      case "map":
+        return MapIR.fromAST(v[1], ctx);
+      case "apply":
+        return ApplyIR.fromAST(v[1], ctx);
+      case "for-each":
+        return ForeachIR.fromAST(v[1], ctx);
+      case "list":
+        return ListIR.fromAST(v[1], ctx);
+      case "lambda":
+        return LambdaIR.fromAST(v[1], ctx);
+      case "quote":
+        return QuoteIR.fromAST(v[1], ctx);
+      default:
+        break;
+      }
+
+      if (!ctx.contains(symbol)) {
+        irError(format("Call to unknown function: %s", symbol));
+        assert(0);
+      }
+
+      fn = ctx.get(symbol);
+    } else if (valueIsList(v[0])) {
+      init = IR.fromAST(v[0], ctx);
+      auto returnIR = init.getReturnIR();
+      if (auto vir = cast(VariableIR)returnIR) {
+        fn = vir.name;
+      } else {
+        irError(format("Invalid funcall near: %s", formatValue(value)));
+      }      
     }
-
-    if (!ctx.contains(symbol)) {
-      irError(format("Call to unknown function: %s", symbol));
-      assert(0);
-    }
-
-    auto fn = ctx.get(symbol);
 
     string returnVariable = ctx.setTmp(format("%s_result", fn));
-    auto fir = new FuncallIR(fn, [], returnVariable);
+    auto fir = new FuncallIR(fn, [], returnVariable, init);
 
     foreach (arg; listToVector(v[1])) {
       fir.arguments ~= IR.fromAST(arg, ctx);
@@ -176,7 +207,7 @@ class DefineFunctionIR : IR {
     if (ctx.contains(symbol)) {
       irWarning(format("Shadowing assignment: %s", symbol));
     }
-    dir.name = format("BSDScheme_%s", symbol);
+    dir.name = symbol == "main" ? "BSDScheme_main" : symbol;
     ctx.set(symbol, dir.name, false);
 
     auto arg2 = cdr(definition);
@@ -198,7 +229,7 @@ class DefineFunctionIR : IR {
   }
 
   override IR getReturnIR() {
-    return block.getReturnIR();
+    return new VariableIR(name);
   }
 }
 
@@ -232,6 +263,10 @@ class DefineIR : IR {
     dir.value = new AssignmentIR(symbol, ir);
 
     return dir;
+  }
+
+  override IR getReturnIR() {
+    return value.getReturnIR();
   }
 }
 
@@ -338,13 +373,105 @@ class LetStarIR : LetXIR {
 
 class SetIR : IR {
   static AssignmentIR fromAST(Value value, Context ctx) {
-    auto symbol = valueToString(car(value));
-    auto val = car(cdr(value));
+    auto v = listToVector(value);
+    auto symbol = valueToString(v[0]);
+    auto val = v[1];
 
     if (!ctx.contains(symbol)) {
       irError(format("Attempted to set! undefined symbol: %s", symbol));
     }
 
     return new AssignmentIR(symbol, IR.fromAST(val, ctx), true);
+  }
+}
+
+class MapIR : IR {
+  IR fn;
+  IR list;
+  string tmp;
+  string returnVariable;
+
+  static MapIR fromAST(Value value, Context ctx) {
+    auto v = listToVector(value);
+    auto mir = new MapIR;
+    mir.fn = IR.fromAST(v[0], ctx);
+    mir.list = IR.fromAST(v[1], ctx);
+    mir.tmp = ctx.setTmp("map_vector_result");
+    mir.returnVariable = ctx.setTmp("map_result");
+    return mir;
+  }
+
+  override IR getReturnIR() {
+    return new VariableIR(returnVariable);
+  }
+}
+
+class ForeachIR : MapIR {
+  static ForeachIR fromAST(Value value, Context ctx) {
+    auto fir = new ForeachIR;
+    auto mir = MapIR.fromAST(value, ctx);
+    fir.fn = mir.fn;
+    fir.list = mir.list;
+    fir.tmp = mir.tmp;
+    fir.returnVariable = mir.returnVariable;
+    delete mir;
+    return fir;
+  }
+
+  override IR getReturnIR() {
+    return NilIR.get();
+  }
+}
+
+class ApplyIR : IR {
+  IR fn;
+  IR args;
+
+  static IR fromAST(Value value, Context ctx) {
+    return FuncallIR.fromAST(value, ctx);
+  }
+}
+
+class ListIR : IR {
+  IR[] list;
+  string returnVariable;
+
+  static IR fromAST(Value value, Context ctx) {
+    auto lir = new ListIR;
+    foreach (el; listToVector(value)) {
+      lir.list ~= IR.fromAST(el, ctx);
+    }
+    lir.returnVariable = ctx.setTmp("list");
+    return lir;
+  }
+
+  override IR getReturnIR() {
+    return new VariableIR(returnVariable);
+  }
+}
+
+class LambdaIR : IR {
+  static IR fromAST(Value value, Context ctx) {
+    auto lambdaName = makeStringValue(ctx.setTmp("lambda"));
+    auto defineArgsTransform = makeListValue(makeListValue(lambdaName,
+                                             car(value)),
+                                             cdr(value));
+    return DefineIR.fromAST(defineArgsTransform, ctx);
+  }
+}
+
+class QuoteIR : IR {
+  string tmp;
+  string serialized;
+
+  static IR fromAST(Value value, Context ctx) {
+    auto qir = new QuoteIR;
+    qir.tmp = ctx.setTmp("quoted");
+    qir.serialized = formatValue(car(value));
+    return qir;
+  }
+
+  override IR getReturnIR() {
+    return new VariableIR(tmp);
   }
 }
