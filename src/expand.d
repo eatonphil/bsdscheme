@@ -14,8 +14,13 @@ alias Extension = Value function(Value);
 alias Extensions = Extension[string];
 
 Extension syntaxRules(Value ast) {
-  return Value function(Value) {
-    
+  auto keywords = vectorToList(car(ast));
+  auto rules = vectorToList(cdr(ast));
+
+  return Value function(Value ast) {
+    if () {
+      
+    }
   }
 }
 
