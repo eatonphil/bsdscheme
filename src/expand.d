@@ -26,55 +26,59 @@ alias Extensions = Extension[string];
  * (when #t (display "here\n"))
  */
 
-Nullable!(Value[string]) matchRuleAndBind(Value rule, string[] keywords, Value args) {
-  Nullable!(Value[string]) ctx = [" ": nilValue].nullable;
-
+Nullable!(Value[][string]) matchRuleAndBind(Value rule, string[] keywords, Value args, ref Nullable!(Value[][string]) ctx) {
   if (valueIsNil(rule)) {
+    if (!valueIsNil(args)) {
+      ctx.nullify();
+    }
+
     return ctx;
   }
 
   if (valueIsList(rule)) {
-    if (!valueIsList(args)) {
-      ctx.nullify();
-      return ctx;
+    auto a1 = args;
+    if (valueIsList(args)) {
+      a1 = car(args);
     }
 
     auto r1 = car(rule);
-    auto a1 = car(args);
 
-    auto carCtx = [" ": nilValue].nullable;
-
+    auto ellipsisMatched = true;
     if (valueIsSymbol(r1)) {
       auto sym = valueToSymbol(r1);
       if (sym == "...") {
-        carCtx["..."] = args;
+        if (sym !in ctx) {
+          ctx["..."] = [];
+          ellipsisMatched = true;
+        }
+
+        ctx["..."] ~= args;
       }
     }
 
-    if ("..." !in carCtx) {
-      carCtx = matchRuleAndBind(r1, keywords, a1);
+    if (!ellipsisMatched) {
+      ctx = matchRuleAndBind(r1, keywords, a1, ctx);
     }
-    
-    if (carCtx.isNull) {
-      return carCtx;
-    } else {
-      auto cdrCtx = matchRuleAndBind(cdr(rule), keywords, cdr(args));
+
+    if (!ctx.isNull && valueIsList(args)) {
+      auto cdrCtx = matchRuleAndBind(cdr(rule), keywords, cdr(args), ctx);
       if (cdrCtx.isNull) {
         return cdrCtx;
       }
 
       foreach (key, value; cdrCtx) {
-        carCtx[key] = value;
+        ctx[key] = value;
       }
-
-      return carCtx;
     }
+
+    return ctx;
   } else {
     auto rSym = valueToSymbol(rule);
 
     // Match keyword
     if (keywords.canFind(rSym)) {
       if (valueIsSymbol(args) && valueToSymbol(args) == rSym) {
+        writeln(formatValue(rule), formatValue(args), 789);
         ctx.nullify();
         return ctx;
       }
@@ -86,10 +90,10 @@ Nullable!(Value[string]) matchRuleAndBind(Value rule, string[] keywords, Value a
     case "_": // Match anything/nothing;
       break;
     case "...": // Match rest
-      ctx[rSym] = args;
+      ctx[rSym] = [args];
       break;
     default:
-      ctx[rSym] = args;
+      ctx[rSym] = [args];
       break;
     }
   }
@@ -97,7 +101,7 @@ Nullable!(Value[string]) matchRuleAndBind(Value rule, string[] keywords, Value a
   return ctx;
 }
 
-Value bindTransformation(Value tfm, Value[string] bindings) {
+Value bindTransformation(Value tfm, Value[][string] bindings) {
   if (valueIsNil(tfm)) {
     return tfm;
   } else if (valueIsList(tfm)) {
@@ -107,6 +111,8 @@ Value bindTransformation(Value tfm, Value[string] bindings) {
     if (valueIsList(_cdr)) {
       auto cadr = car(cdr(tfm));
       if (valueIsSymbol(cadr) && valueToSymbol(cadr) == "...") {
+        writeln(bindings["..."].length);
+        bindings["..."] = bindings["..."][1 .. bindings["..."].length];
         return appendList(makeListValue(_car, nilValue), car(_cdr));
       }
     }
@@ -114,7 +120,7 @@ Value bindTransformation(Value tfm, Value[string] bindings) {
   } else {
     auto sym = valueToSymbol(tfm);
     if (sym in bindings) {
-      return bindings[sym];
+      return bindings[sym][0];
     }
 
     return tfm;
@@ -132,11 +138,13 @@ Extension syntaxRules(Value ast) {
 
   return delegate Value (Value ast) {
     foreach (ruleAndTransformation; rules) {
+      writeln(1);
       auto rule = car(ruleAndTransformation);
       auto tfm = car(cdr(ruleAndTransformation));
-      auto ctx = matchRuleAndBind(rule, keywords, ast);
-      if (!ctx.isNull) {
-        return bindTransformation(tfm, ctx);
+      Nullable!(Value[][string]) ctx = [" ": [nilValue]].nullable;
+      auto bindings = matchRuleAndBind(rule, keywords, ast, ctx);
+      if (!bindings.isNull) {
+        return bindTransformation(tfm, bindings);
       }
     }
 
@@ -182,7 +190,10 @@ Value _expand(Value ast, ref Extensions extensions) {
         assert(0);
       default:
         if (sym in extensions) {
-          return _expand(extensions[sym](ast), extensions);
+          writeln(1, formatValue(ast));
+          auto c = _expand(extensions[sym](ast), extensions);
+          writeln(2, formatValue(c));
+          return c;
         }
       }
     }

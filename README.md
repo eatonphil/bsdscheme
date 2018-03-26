@@ -84,7 +84,7 @@ $ ./a
   * Command-line REPL
   * `if`, `let`, `define`, `begin` tail calls optimized (interpreter only)
   * R7RS Libraries (interpreter only)
-  * Basic define-syntax/syntax-rules support
+  * Basic define-syntax/syntax-rules support, not hygienic
 * Missing (but planned, R7RS is the obvious goal):
   * Labelled let
   * D FFI
