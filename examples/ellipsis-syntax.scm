@@ -3,7 +3,8 @@
     ((when test result ...)
      (if test (begin result ...) '()))))
 
-(when #t
-      (display "heyy")
-      (newline)
-      (newline))
+(define (main)
+  (when #t
+        (display "heyy")
+        (newline)
+        (newline)))

@@ -42,7 +42,19 @@ Nullable!(Value[string]) matchRuleAndBind(Value rule, string[] keywords, Value a
     auto r1 = car(rule);
     auto a1 = car(args);
 
-    auto carCtx = matchRuleAndBind(r1, keywords, a1);
+    auto carCtx = [" ": nilValue].nullable;
+
+    if (valueIsSymbol(r1)) {
+      auto sym = valueToSymbol(r1);
+      if (sym == "...") {
+        carCtx["..."] = args;
+      }
+    }
+
+    if ("..." !in carCtx) {
+      carCtx = matchRuleAndBind(r1, keywords, a1);
+    }
+    
     if (carCtx.isNull) {
       return carCtx;
     } else {
@@ -91,6 +103,13 @@ Value bindTransformation(Value tfm, Value[string] bindings) {
   } else if (valueIsList(tfm)) {
     auto _car = bindTransformation(car(tfm), bindings);
     auto _cdr = bindTransformation(cdr(tfm), bindings);
+
+    if (valueIsList(_cdr)) {
+      auto cadr = car(cdr(tfm));
+      if (valueIsSymbol(cadr) && valueToSymbol(cadr) == "...") {
+        return appendList(makeListValue(_car, nilValue), car(_cdr));
+      }
+    }
     return makeListValue(_car, _cdr);
   } else {
     auto sym = valueToSymbol(tfm);
