@@ -1,0 +1,19 @@
+cases:
+  - name: syntax extensions with ellipsis
+    status: 0
+    stdout: "Hey!Hey!Hey!"
+
+templates:
+- test.scm: |
+    (import (scheme base) (scheme write))
+
+    (define-syntax when
+      (syntax-rules ()
+        ((when test result ...)
+         (if test (begin result ...) '()))))
+
+    (define (main)
+      (when #t
+            (display "Hey!")
+            (display "Hey!")
+            (display "Hey!")))
