@@ -182,10 +182,7 @@ Value _expand(Value ast, ref Extensions extensions) {
         assert(0);
       default:
         if (sym in extensions) {
-          writeln("before: ", formatValue(ast));
-          auto r = _expand(extensions[sym](ast), extensions);
-          writeln("after: ", formatValue(r));
-          return r;
+          return _expand(extensions[sym](ast), extensions);
         }
       }
     }
