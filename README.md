@@ -82,10 +82,10 @@ $ ./a
   * Read / eval / include
   * Comments
   * Command-line REPL
-  * `if`, `let`, `define`, `begin` tail calls optimized
-  * R7RS Libraries
+  * `if`, `let`, `define`, `begin` tail calls optimized (interpreter only)
+  * R7RS Libraries (interpreter only)
+  * Basic define-syntax/syntax-rules support
 * Missing (but planned, R7RS is the obvious goal):
-  * Macros
   * Labelled let
   * D FFI
   * Threading support
