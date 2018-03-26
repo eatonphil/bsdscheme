@@ -1,6 +1,7 @@
 import std.stdio;
 import std.string;
 
+import expand : expand;
 import parse;
 import utility;
 import value;
@@ -22,6 +23,7 @@ void repl() {
 
     if (line.length) {
       Value value = car(read(line.dup));
+      value = expand(value);
       eval(value, cast(void**)[ctx]);
     }
 

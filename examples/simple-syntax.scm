@@ -4,4 +4,4 @@
      (if test result '()))))
 
 (define (main)
-  (when #t (display "heyy\n")))
+  (when #t< (display "heyy\n")))

@@ -5,6 +5,7 @@ import std.stdio;
 import std.typecons;
 
 import common;
+import expand : expand;
 import utility;
 import value;
 
@@ -279,6 +280,7 @@ Value include(Value arguments, void** rest) {
   Value source = makeStringValue(fileContents);
   Value readArgs = makeListValue(source, nilValue);
   Value parsed = _read(readArgs, rest);
+  parsed = expand(parsed);
   return eval(parsed, rest);
 }
 
