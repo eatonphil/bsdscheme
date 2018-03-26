@@ -62,10 +62,11 @@ Token* lexBool(StringBuffer input, int line, ref int column) {
     input.next();
 
     column++;
-    if (input.current() == 't' || input.current() == 'f') {
+    auto c = input.current();
+    if (c == 't' || c == 'f') {
       column++;
       input.next();
-      return new Token(line, column, "", "#", TokenType.Atom, SchemeType.Bool);
+      return new Token(line, column, "", format("#%c", c), TokenType.Atom, SchemeType.Bool);
     }
 
     column--;
@@ -104,7 +105,6 @@ Token* lexSymbol(StringBuffer input, int line, ref int column) {
     switch (c) {
     case '(':
     case ')':
-    case '.':
     case '#':
     case '\'':
     case ' ':
@@ -181,6 +181,13 @@ Token* lexVector(StringBuffer input, int line, int column) {
 
 Token* lexDot(StringBuffer input, int line, int column) {
   if (input.current() == '.') {
+    input.next();
+    if (input.current() == '.') {
+      input.previous();
+      return null;
+    }
+
+    // Match single dot only.
     return new Token(line, column, "", ".", TokenType.Dot, SchemeType.Symbol);
   }
 
@@ -224,6 +231,10 @@ TokenBuffer lex(StringBuffer input) {
     }
 
     if (token is null) {
+      token = lexDot(input, line, column);
+    }
+
+    if (token is null) {
       token = lexSymbol(input, line, column);
     }
 
@@ -245,10 +256,6 @@ TokenBuffer lex(StringBuffer input) {
 
     if (token is null) {
       token = lexVector(input, line, column);
-    }
-
-    if (token is null) {
-      token = lexDot(input, line, column);
     }
 
     if (token !is null) {
