@@ -62,10 +62,11 @@ Token* lexBool(StringBuffer input, int line, ref int column) {
     input.next();
 
     column++;
-    if (input.current() == 't' || input.current() == 'f') {
+    auto c = input.current();
+    if (c == 't' || c == 'f') {
       column++;
       input.next();
-      return new Token(line, column, "", "#", TokenType.Atom, SchemeType.Bool);
+      return new Token(line, column, "", format("#%c", c), TokenType.Atom, SchemeType.Bool);
     }
 
     column--;

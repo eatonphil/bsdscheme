@@ -41,8 +41,7 @@ void build(string buildFile, string[] localDImports, string outFile) {
 int main(string[] args) {
   auto source = cast(char[])read(args[1]);
   Value value = parse.read(source);
-  Value delegate(Value)[string] syntaxExtensions;
-  value = expand(value, syntaxExtensions);
+  value = expand(value);
 
   auto ctx = Context.getDefault();
   IR ir = IR.fromAST(withBegin(value), ctx);

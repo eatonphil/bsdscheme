@@ -21,7 +21,7 @@ alias Extensions = Extension[string];
  * (define-syntax (when)
  *   (syntax-rules ()
  *     ((_ test then ...)
- *      (if test then '()))))
+ *      (if test (begin then ...) '())))))
  *
  * (when #t (display "here\n"))
  */
@@ -42,11 +42,11 @@ Nullable!(Value[string]) matchRuleAndBind(Value rule, string[] keywords, Value a
     auto r1 = car(rule);
     auto a1 = car(args);
 
-    auto carCtx = matchRuleAndBind(car(r1), keywords, car(a1));
+    auto carCtx = matchRuleAndBind(r1, keywords, a1);
     if (carCtx.isNull) {
       return carCtx;
     } else {
-      auto cdrCtx = matchRuleAndBind(cdr(r1), keywords, cdr(a1));
+      auto cdrCtx = matchRuleAndBind(cdr(rule), keywords, cdr(args));
       if (cdrCtx.isNull) {
         return cdrCtx;
       }
@@ -133,40 +133,65 @@ Extension makeTransformer(Value transformerAst) {
   case "syntax-rules":
     return syntaxRules(_cdr);
   default:
-    exError(format("%s syntax transformer is not supported", transformer));
+    exError(format("%s syntax transformer is not supported: ", formatValue(transformerAst)));
     assert(0);
   }
 }
 
 void defineSyntax(Value ast, ref Extensions extensions) {
   auto dispatcher = valueToString(car(ast));
-  auto transformer = cdr(ast);
+  auto transformer = car(cdr(ast));
   extensions[dispatcher] = makeTransformer(transformer);
 }
 
-Value expand(Value ast, ref Extensions extensions) {
+Value _expand(Value ast, ref Extensions extensions) {
   if (valueIsList(ast)) {
-    auto _car = expand(car(ast), extensions);
-    auto _cdr = expand(cdr(ast), extensions);
-    return makeListValue(_car, _cdr);
-  } else if (valueIsSymbol(ast)) {
-    string symbol = valueToSymbol(ast);
-
-    if (symbol in extensions) {
-      return expand(extensions[symbol](ast), extensions);
-    } else {
-      switch (symbol) {
+    if (valueIsSymbol(car(ast))) {
+      auto sym = valueToSymbol(car(ast));
+      switch (sym) {
       case "define-syntax":
         defineSyntax(cdr(ast), extensions);
         return nilValue;
+      case "let-syntax":
+        writeln("let-syntax not supported yet");
+        assert(0);
+      case "letrec-syntax":
+        writeln("letrec-syntax not supported yet");
+        assert(0);
       case "syntax-error":
         writeln("Syntax error");
         assert(0);
       default:
-        return ast;
+        if (sym in extensions) {
+          writeln("before: ", formatValue(ast));
+          auto r = _expand(extensions[sym](ast), extensions);
+          writeln("after: ", formatValue(r));
+          return r;
+        }
       }
     }
+
+    auto _car = _expand(car(ast), extensions);
+    auto _cdr = _expand(cdr(ast), extensions);
+    return makeListValue(_car, _cdr);
   }
 
   return ast;
+}
+
+Value expand(Value ast) {
+  Value delegate(Value)[string] syntaxExtensions;
+
+  // Filter out nilValues in top-level
+  auto values = listToVector(_expand(ast, syntaxExtensions));
+  Value[] r;
+  foreach (v; values) {
+    if (valueIsNil(v)) {
+      continue;
+    }
+
+    r ~= v;
+  }
+
+  return vectorToList(r);
 }

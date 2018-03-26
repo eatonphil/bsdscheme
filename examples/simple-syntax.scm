@@ -3,4 +3,5 @@
     ((when test result)
      (if test result '()))))
 
-(when #t (display "heyy\n"))
+(define (main)
+  (when #t (display "heyy\n")))
