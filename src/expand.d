@@ -53,10 +53,12 @@ bool matchRuleAndBind(Value rule, string[] keywords, Value args, ref Value[][str
         }
 
         ctx["..."] ~= args;
+
+        return true;
       }
     }
 
-    if (!ellipsisMatched && !matchRuleAndBind(r1, keywords, a1, ctx)) {
+    if (!matchRuleAndBind(r1, keywords, a1, ctx)) {
       return false;
     }
 
