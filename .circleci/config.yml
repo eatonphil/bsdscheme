@@ -9,7 +9,7 @@ jobs:
           name: Install debian-packaged dependencies
           command: |
             apt update
-            apt install -y ldc git make curl
+            apt install -y ldc git make curl gcc
             ln -s /usr/bin/ldc2 /usr/bin/ldc
       - run:
           name: Install crystal
