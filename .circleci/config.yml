@@ -20,12 +20,12 @@ jobs:
       - run:
           name: Install bsdscheme
           command: |
-            alias crystal=/usr/bin/crystal
             make
             make install
       - run:
           name: Install btest
           command: |
+            alias crystal=/usr/bin/crystal
             git clone https://github.com/briansteffens/btest
             cd btest
             make
