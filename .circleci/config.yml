@@ -10,6 +10,7 @@ jobs:
           command: |
             apt update
             apt install -y ldc git make curl
+            ln -s /usr/bin/ldc2 /usr/bin/ldc
       - run:
           name: Install crystal
           command: |
