@@ -61,18 +61,27 @@ BSDScheme v0.0.0
 2
 ```
 
-### Compiler
+### Compiler (and Macros)
 
 ```
-$ cat examples/compile-basic.scm
-(define (plus a b)
-  (+ a b))
+$ cat examples/my-let.scm
+(define-syntax my-let*
+  (syntax-rules ()
+    ((_ ((p v)) b ...)
+     (let ((p v)) b ...))
+    ((_ ((p1 v1) (p2 v2) ...) b ...)
+     (let ((p1 v1))
+       (my-let* ((p2 v2) ...)
+		b ...)))))
 
 (define (main)
-  (display (plus 1 2)))
-$ ./bin/bsdc examples/compile-basic.scm
+  (my-let* ((a 1)
+            (b (+ a 2)))
+           (display (+ a b))
+           (newline)))
+$ ./bin/bsdc examples/my-let.scm
 $ ./a
-3
+4
 ```
 
 ## Current state
@@ -84,7 +93,7 @@ $ ./a
   * Command-line REPL
   * `if`, `let`, `define`, `begin` tail calls optimized (interpreter only)
   * R7RS Libraries (interpreter only)
-  * Basic define-syntax/syntax-rules support, not hygienic
+  * Basic define-syntax/syntax-rules support (not hygienic)
 * Missing (but planned, R7RS is the obvious goal):
   * Labelled let
   * D FFI
