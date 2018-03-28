@@ -8,9 +8,11 @@ jobs:
       - run:
           name: Install debian-packaged dependencies
           command: |
-            wget -O - https://dist.crystal-lang.org/apt/setup.sh | bash
-            apt-get update
-            apt-get install -y ldc crystal git
+            apt update
+            apt install -y curl
+            curl https://dist.crystal-lang.org/apt/setup.sh | bash
+            apt update
+            apt install -y ldc crystal git
       - run:
           name: Install bsdscheme
           command: |
