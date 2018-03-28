@@ -18,6 +18,7 @@ jobs:
             tar -xvzf c.tar.gz
             ln -s $pwd/crystal-0.24.2/bin/crystal /usr/bin/crystal
             ls -lah /usr/bin
+            echo $PATH
             which crystal
       - run:
           name: Install bsdscheme
