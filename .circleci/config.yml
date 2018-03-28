@@ -20,5 +20,6 @@ jobs:
             cd btest
             make
             sudo make install
-      - run: Run bsdscheme tests
+      - run:
+          name: Run bsdscheme tests
           command: btest
