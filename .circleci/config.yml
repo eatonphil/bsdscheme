@@ -12,7 +12,7 @@ jobs:
             apt install -y curl gpg
             curl https://dist.crystal-lang.org/apt/setup.sh | bash
             apt update
-            apt install -y ldc crystal git
+            apt install -y ldc crystal git make
       - run:
           name: Install bsdscheme
           command: |
