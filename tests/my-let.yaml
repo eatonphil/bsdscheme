@@ -5,6 +5,8 @@ cases:
 
 templates:
 - test.scm: |
+    (import (scheme base) (scheme write))
+
     (define-syntax my-let*
       (syntax-rules ()
         ((_ ((p v)) b ...)
