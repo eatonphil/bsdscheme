@@ -21,4 +21,4 @@ jobs:
             make
             sudo make install
       - run: Run bsdscheme tests
-        command: btest
+          command: btest
