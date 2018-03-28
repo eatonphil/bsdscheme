@@ -26,78 +26,75 @@ alias Extensions = Extension[string];
  * (when #t (display "here\n"))
  */
 
-Nullable!(Value[string]) matchRuleAndBind(Value rule, string[] keywords, Value args) {
-  Nullable!(Value[string]) ctx = [" ": nilValue].nullable;
-
+bool matchRuleAndBind(Value rule, string[] keywords, Value args, ref Value[][string] ctx) {
   if (valueIsNil(rule)) {
-    return ctx;
+    if (!valueIsNil(args)) {
+      return false;
+    }
+
+    return true;
   }
 
   if (valueIsList(rule)) {
-    if (!valueIsList(args)) {
-      ctx.nullify();
-      return ctx;
+    auto a1 = args;
+    if (valueIsList(args)) {
+      a1 = car(args);
     }
 
     auto r1 = car(rule);
-    auto a1 = car(args);
 
-    auto carCtx = [" ": nilValue].nullable;
-
+    auto ellipsisMatched = false;
     if (valueIsSymbol(r1)) {
       auto sym = valueToSymbol(r1);
       if (sym == "...") {
-        carCtx["..."] = args;
+        if (sym !in ctx) {
+          ctx["..."] = [];
+          ellipsisMatched = true;
+        }
+
+        ctx["..."] ~= args;
+
+        return true;
       }
     }
 
-    if ("..." !in carCtx) {
-      carCtx = matchRuleAndBind(r1, keywords, a1);
+    if (!matchRuleAndBind(r1, keywords, a1, ctx)) {
+      return false;
     }
-    
-    if (carCtx.isNull) {
-      return carCtx;
-    } else {
-      auto cdrCtx = matchRuleAndBind(cdr(rule), keywords, cdr(args));
-      if (cdrCtx.isNull) {
-        return cdrCtx;
-      }
 
-      foreach (key, value; cdrCtx) {
-        carCtx[key] = value;
-      }
-
-      return carCtx;
+    if (valueIsList(args) && !matchRuleAndBind(cdr(rule), keywords, cdr(args), ctx)) {
+      return false;
     }
+
+    return true;
   } else {
     auto rSym = valueToSymbol(rule);
 
     // Match keyword
     if (keywords.canFind(rSym)) {
       if (valueIsSymbol(args) && valueToSymbol(args) == rSym) {
-        ctx.nullify();
-        return ctx;
+        return false;
       }
 
-      return ctx;
+      return true;
     }
 
     switch (rSym) {
     case "_": // Match anything/nothing;
-      break;
-    case "...": // Match rest
-      ctx[rSym] = args;
-      break;
+      return true;
+    case "...":
+      // Already handled in the above case.
+      return true;
     default:
-      ctx[rSym] = args;
-      break;
+      ctx[rSym] = [args];
+      return true;
     }
   }
 
-  return ctx;
+  return false;
 }
 
-Value bindTransformation(Value tfm, Value[string] bindings) {
+Value bindTransformation(Value tfm, Value[][string] bindings) {
   if (valueIsNil(tfm)) {
     return tfm;
   } else if (valueIsList(tfm)) {
@@ -107,6 +104,16 @@ Value bindTransformation(Value tfm, Value[string] bindings) {
     if (valueIsList(_cdr)) {
       auto cadr = car(cdr(tfm));
       if (valueIsSymbol(cadr) && valueToSymbol(cadr) == "...") {
+        if ("..." !in bindings) {
+          exError(format("No matching ellipsis to bind near '%s'", formatValue(tfm)));
+          assert(0);
+        }
+
+        if (bindings["..."].length == 1) {
+          bindings["..."] = [];
+        } else {
+          bindings["..."] = bindings["..."][1 .. bindings["..."].length];
+        }
         return appendList(makeListValue(_car, nilValue), car(_cdr));
       }
     }
@@ -114,7 +121,7 @@ Value bindTransformation(Value tfm, Value[string] bindings) {
   } else {
     auto sym = valueToSymbol(tfm);
     if (sym in bindings) {
-      return bindings[sym];
+      return bindings[sym][0];
     }
 
     return tfm;
@@ -131,16 +138,17 @@ Extension syntaxRules(Value ast) {
   }
 
   return delegate Value (Value ast) {
-    foreach (ruleAndTransformation; rules) {
+    foreach (i, ruleAndTransformation; rules) {
       auto rule = car(ruleAndTransformation);
       auto tfm = car(cdr(ruleAndTransformation));
-      auto ctx = matchRuleAndBind(rule, keywords, ast);
-      if (!ctx.isNull) {
+      Value[][string] ctx = [" ": [nilValue]];
+      auto matched = matchRuleAndBind(rule, keywords, ast, ctx);
+      if (matched) {
         return bindTransformation(tfm, ctx);
       }
     }
 
-    exError(format("Syntax error: %s", formatValue(ast)));
+    exError(format("Syntax did not match any patterns: %s", formatValue(ast)));
     assert(0);
   };
 }
