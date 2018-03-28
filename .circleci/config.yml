@@ -8,7 +8,7 @@ jobs:
       - run:
           name: Install debian-packaged dependencies
           command: |
-            curl https://dist.crystal-lang.org/apt/setup.sh | bash
+            wget -O - https://dist.crystal-lang.org/apt/setup.sh | bash
             apt-get update
             apt-get install -y ldc crystal git
       - run:
