@@ -7,19 +7,19 @@ jobs:
       - checkout
       - run:
           name: Install debian-packaged dependencies
-          command: sudo apt-get install -y ldc crystal git
+          command: apt-get install -y ldc crystal git
       - run:
           name: Install bsdscheme
           command: |
             make
-            sudo make install
+            make install
       - run:
           name: Install btest
           command: |
             git clone https://github.com/briansteffens/btest
             cd btest
             make
-            sudo make install
+            make install
       - run:
           name: Run bsdscheme tests
           command: btest
