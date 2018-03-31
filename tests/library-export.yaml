@@ -1,7 +1,7 @@
 cases:
   - name: library hides non-exported symbols
     status: 1
-    stdout: "[ERROR] Undefined symbol: p"
+    stdout: "[ERROR] Undefined symbol: p\n"
 
 templates:
 - helper.scm: |
