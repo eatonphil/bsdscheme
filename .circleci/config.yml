@@ -2,14 +2,14 @@ version: 2
 jobs:
   build:
     docker:
-      - image: debian:buster
+      - image: dlanguage/ldc
     steps:
       - checkout
       - run:
           name: Install debian-packaged dependencies
           command: |
             apt update
-            apt install -y git ldc dub build-essential
+            apt install -y git build-essential
             ln -s /usr/bin/ldc2 /usr/bin/ldc
       - run:
           name: Install btest
