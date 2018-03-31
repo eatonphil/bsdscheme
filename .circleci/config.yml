@@ -10,7 +10,7 @@ jobs:
           command: |
             apt update
             apt install -y git build-essential
-            ln -s /usr/bin/ldc2 /usr/bin/ldc
+            ln -s /usr/local/bin/ldc2 /usr/local/bin/ldc
       - run:
           name: Install btest
           command: |
