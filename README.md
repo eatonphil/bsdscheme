@@ -1,5 +1,7 @@
 # BSDScheme
 
+[![CircleCI](https://circleci.com/gh/eatonphil/bsdscheme.svg?style=svg)](https://circleci.com/gh/eatonphil/bsdscheme)
+
 This is a Scheme implementation written in D intended to eventually
 target Scheme R7RS. There is an interpreter backend which is more
 mature and there is a compiler backend that targets D.
